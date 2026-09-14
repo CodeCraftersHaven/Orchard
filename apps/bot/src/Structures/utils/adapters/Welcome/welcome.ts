@@ -16,7 +16,9 @@ const defaultWelcomeMessages = [
   'We hope you find what you\'re looking for and enjoy your stay, {member}.',
   '{member} has just joined the server.',
   'Welcome {member}! We were waiting for you.',
-  'Hi {member}! Welcome to our community! Please make yourself at home!'
+  'Hi {member}! Welcome to our community! Please make yourself at home!',
+  "Welcome, {member}! Hopefully you aren't a moose because they're one of the main prey for orca whales 🫎"
+
 ];
 
 /**
@@ -188,7 +190,7 @@ export async function welcomeCreate(
 
   ctx.font = '36px "Lobster"';
   ctx.textAlign = 'center';
-  ctx.fillStyle = '#2d4a22'; 
+  ctx.fillStyle = '#2d4a22';
   ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
   ctx.shadowBlur = 6;
   ctx.fillText(`Member #${memberCount}`, avatarCenterX, avatarCenterY + avatarRadius + 50);
@@ -227,7 +229,8 @@ export async function welcomeCreate(
       `${member} has arrived. The party has started.`,
       `Welcome ${member}! We were waiting for you (͡ ° ͜ʖ ͡ °)`,
       `${member} never gonna let you down, ${member} never gonna give you up.`,
-      `Hi ${member}! Welcome to our community! Please make yourself at home!`
+      `Hi ${member}! Welcome to our community! Please make yourself at home!`,
+      `Welcome, {member}! Hopefully you aren't a moose because they're one of the main prey for orca whales 🫎`
     ]) +
     `\n-# You may now go to <#${channels.intro}> to introduce yourself and <#${channels.roles}> to get some roles!`;
 
