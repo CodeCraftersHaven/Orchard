@@ -4,11 +4,18 @@ services:
       context: .
       dockerfile: Dockerfile
       target: api
+      args:
+        NODE_ENV: production
+        BASE_URL: ${BASE_URL}
+        API_BASE_URL: ${API_BASE_URL}
+        DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
     restart: always
     env_file:
-      - .env
+      - .env.production
     environment:
       NODE_ENV: production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8989:8989"
     networks:
@@ -19,9 +26,18 @@ services:
       context: .
       dockerfile: Dockerfile
       target: dash
+      args:
+        NODE_ENV: production
+        BASE_URL: ${BASE_URL}
+        API_BASE_URL: ${API_BASE_URL}
+        DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
     restart: always
+    env_file:
+      - .env.production
     environment:
       NODE_ENV: production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
       - "8990:8990"
     networks:
@@ -32,11 +48,18 @@ services:
       context: .
       dockerfile: Dockerfile
       target: bot
+      args:
+        NODE_ENV: production
+        BASE_URL: ${BASE_URL}
+        API_BASE_URL: ${API_BASE_URL}
+        DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
     restart: always
     env_file:
-      - .env
+      - .env.production
     environment:
       NODE_ENV: production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - db-net
 

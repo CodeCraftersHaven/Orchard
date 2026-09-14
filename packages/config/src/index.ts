@@ -3,11 +3,17 @@ import { CONFIG_KEYS } from "./constants.js";
 import { resolve } from "node:path";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-export const env = load(CONFIG_KEYS, resolve(projectRoot, ".env"), true);
-const mode = env.NODE_ENV;
+const mode = process.env.NODE_ENV ?? "development";
+const envPath = mode === "production"
+    ? resolve(projectRoot, ".env.production")
+    : resolve(projectRoot, ".env");
+const fallbackPath = existsSync(envPath) ? envPath : resolve(projectRoot, ".env");
 
-if (mode !== "development" && mode !== "production") {
-    throw new Error(`NODE_ENV must be development or production, received '${mode}'`);
+export const env = load(CONFIG_KEYS, fallbackPath, true);
+
+if (env.NODE_ENV !== "development" && env.NODE_ENV !== "production") {
+    throw new Error(`NODE_ENV must be development or production, received '${env.NODE_ENV}'`);
 }
