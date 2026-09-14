@@ -1,0 +1,73 @@
+declare var __DEV__: boolean
+declare var __PROD__: boolean
+declare var __VERSION__: string
+declare namespace NodeJS {
+    interface ProcessEnv {
+        LESSOPEN:string
+        MAIL:string
+        AI_AGENT:string
+        USER:string
+        SSH_CLIENT:string
+        npm_config_user_agent:string
+        GIT_EDITOR:string
+        GIT_ASKPASS:string
+        BUN_INSTALL:string
+        npm_node_execpath:string
+        SHLVL:string
+        COPILOT_AGENT:string
+        BROWSER:string
+        npm_config_noproxy:string
+        HOME:string
+        TERM_PROGRAM_VERSION:string
+        VSCODE_IPC_HOOK_CLI:string
+        npm_package_json:string
+        PYENV_SHELL:string
+        npm_package_engines_node:string
+        VSCODE_GIT_ASKPASS_MAIN:string
+        VSCODE_GIT_ASKPASS_NODE:string
+        npm_config_userconfig:string
+        npm_config_local_prefix:string
+        VSCODE_PYTHON_AUTOACTIVATE_GUARD:string
+        COLORTERM:string
+        COLOR:string
+        DEBUGINFOD_URLS:string
+        LOGNAME:string
+        _:string
+        npm_config_prefix:string
+        npm_config_npm_version:string
+        TERM:string
+        npm_config_cache:string
+        HISTCONTROL:string
+        npm_config_node_gyp:string
+        PATH:string
+        NODE:string
+        npm_package_name:string
+        LANG:string
+        DOTNET_BUNDLE_EXTRACT_BASE_DIR:string
+        LS_COLORS:string
+        VSCODE_GIT_IPC_HANDLE:string
+        TERM_PROGRAM:string
+        npm_lifecycle_script:string
+        DEBIAN_FRONTEND:string
+        SHELL:string
+        npm_package_version:string
+        npm_lifecycle_event:string
+        LESSCLOSE:string
+        VSCODE_GIT_ASKPASS_EXTRA_ARGS:string
+        GIT_PAGER:string
+        npm_config_globalconfig:string
+        npm_config_init_module:string
+        PWD:string
+        GIT_MERGE_AUTOEDIT:string
+        npm_execpath:string
+        COPILOT_DEBUG_NONCE:string
+        SSH_CONNECTION:string
+        PYENV_ROOT:string
+        npm_config_global_prefix:string
+        npm_config_allow_scripts:string
+        npm_command:string
+        PNPM_HOME:string
+        INIT_CWD:string
+        EDITOR:string
+    }
+}

@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-discord-blurple: #5865f2;
+  --color-discord-green: #23a55a;
+  --color-discord-dark: #0b0d12;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply text-slate-100 antialiased;
+}

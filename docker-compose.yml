@@ -1,0 +1,45 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: api
+    restart: always
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    ports:
+      - "8989:8989"
+    networks:
+      - db-net
+
+  dash:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: dash
+    restart: always
+    environment:
+      NODE_ENV: production
+    ports:
+      - "8990:8990"
+    networks:
+      - db-net
+
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: bot
+    restart: always
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    networks:
+      - db-net
+
+networks:
+  db-net:
+    external: true

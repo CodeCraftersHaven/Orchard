@@ -1,0 +1,140 @@
+datasource db {
+    provider = "postgresql"
+}
+
+generator client {
+    provider = "prisma-client-js"
+}
+
+// Economy
+model Money {
+    id       Int     @id @default(dbgenerated("(floor(random() * (2147483647 - 1 + 1)) + 1)::int"))
+    username String
+    nickname String?
+    userID   String  @unique
+    serverID String
+    bank     Int     @default(0)
+    wallet   Int     @default(0)
+}
+
+model Member {
+    id        Int    @id @default(dbgenerated("(floor(random() * (2147483647 - 1 + 1)) + 1)::int"))
+    messageId String
+    memberId  String @unique
+}
+
+model Guild {
+    gID                    String @id @unique
+    gName                  String
+    announcementsChannelId String @default("")
+    rolesChannelId         String @default("")
+    modC                   String @default("")
+    gamingChannelId        String @default("")
+    taskLogsChannelId      String @default("")
+    verifiedRole           String @default("")
+    reactionMessageId      String @default("")
+}
+
+model ServerStats {
+    id            Int    @id @default(dbgenerated("(floor(random() * (2147483647 - 1 + 1)) + 1)::int"))
+    gID           String @unique
+    userCount     Int    @default(0)
+    botCount      Int    @default(0)
+    allCount      Int    @default(0)
+    userCountChan String @default("")
+    botCountChan  String @default("")
+    allCountChan  String @default("")
+}
+
+// Birthday System
+model BirthdayEntry {
+    userID        String                 @id
+    date          String
+    nickname      String?
+    username      String
+    subscriptions BirthdaySubscription[]
+}
+
+model Birthday {
+    id            Int                    @id @default(dbgenerated("(floor(random() * (2147483647 - 1 + 1)) + 1)::int"))
+    gID           String                 @unique
+    settings      BirthdaySettings       @relation(fields: [settingsId], references: [gID])
+    settingsId    String                 @unique
+    subscriptions BirthdaySubscription[]
+}
+
+model BirthdaySettings {
+    gID               String    @id @unique
+    enabled           Boolean   @default(false)
+    announceChannelId String    @default("")
+    logChannelId      String    @default("")
+    logMessageId      String    @default("")
+    monthLogMessageId String    @default("")
+    birthday          Birthday?
+}
+
+model BirthdaySubscription {
+    userID   String
+    gID      String
+    user     BirthdayEntry @relation(fields: [userID], references: [userID], onDelete: Cascade)
+    birthday Birthday      @relation(fields: [gID], references: [gID], onDelete: Cascade)
+
+    @@id([userID, gID])
+}
+
+// Counting System
+model Counter {
+    gID          String         @id @unique
+    channel      String
+    active       Boolean        @default(false)
+    count        Int
+    lastUser     String?
+    lastCount    Int?
+    highestCount Int
+    users        CountingUser[]
+}
+
+model CountingUser {
+    id        String   @id
+    coins     Int
+    counter   Counter? @relation(fields: [counterId], references: [gID])
+    counterId String?
+}
+
+// Welcome System
+model WelcomeSettings {
+    gID                 String  @id @unique
+    enabled             Boolean @default(false)
+    channelId           String  @default("")
+    backgroundUrl       String  @default("")
+    avatarPosition      String  @default("middle")
+    leaveEnabled        Boolean @default(false)
+    leaveChannelId      String  @default("")
+    leaveBackgroundUrl  String  @default("")
+    leaveAvatarPosition String  @default("middle")
+}
+
+model CustomWelcomeMessages {
+    memberId      String   @id @unique
+    random        Boolean
+    singleMessage String?
+    messagesArray String[]
+}
+
+model BotWelcomeMessages {
+    gID           String   @id @unique
+    singleMessage Boolean  @default(true)
+    messagesArray String[]
+}
+
+//Task System
+model TaskMessages {
+    messageId String @id @unique
+}
+
+model User {
+    avatar    String?
+    createdAt DateTime @default(now())
+    id        String   @id
+    username  String
+}

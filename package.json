@@ -1,0 +1,56 @@
+{
+  "name": "orchard",
+  "version": "1.0.0",
+  "description": "Bundled package for the Orchard Ecosystem",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently --names api,dash,bot --prefix name \"npm run dev --workspace=@orchard/api\" \"npm run dev --workspace=@orchard/dash\" \"npm run dev --workspace=@orchard/bot\"",
+    "docker:prod": "docker compose up --build",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "eslint": "eslint . --ext .ts,.tsx",
+    "pretty": "prettier **/*.ts -w",
+    "api:build": "npm exec -w @orchard/api -- tsc",
+    "api:start": "npm exec -w @orchard/api -- node dist/index.js",
+    "bot:build": "npm exec -w @orchard/bot -- sern build",
+    "bot:start": "npm exec -w @orchard/bot -- node .",
+    "bot:publish": "npm exec -w @orchard/bot -- sern commands publish",
+    "database:generate": "npm exec -w @orchard/database -- npx prisma generate",
+    "database:db-push": "npm exec -w @orchard/database -- npx prisma db push",
+    "dash:dev": "npm exec -w @orchard/dash -- vite --host 0.0.0.0",
+    "dash:build": "npm exec -w @orchard/dash -- tsc && npm exec -w @orchard/dash -- vite build",
+    "dash:preview": "npm exec -w @orchard/dash -- vite preview --host 0.0.0.0 --port 8990",
+    "config:build": "npm exec -w @orchard/config -- tsc",
+    "config:dev": "npm exec -w @orchard/config -- tsc --watch",
+    "types:build": "npm exec -w @orchard/types -- tsc"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.59.2",
+    "@typescript-eslint/parser": "^8.59.2",
+    "concurrently": "^10.0.5",
+    "eslint": "^8.57.1",
+    "prettier": "^3.0.0",
+    "prisma": "^7.8.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "7.8.0",
+    "axios": "^1.20.0"
+  },
+  "license": "ISC",
+  "allowScripts": {
+    "bcrypt@6.0.0": true,
+    "@prisma/engines@7.10.0": true,
+    "prisma@7.10.0": true,
+    "esbuild@0.28.2": true
+  }
+}

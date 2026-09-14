@@ -1,0 +1,52 @@
+{
+  "name": "@orchard/bot",
+  "version": "1.0.0",
+  "description": "Discord bot for The Orchard Community.",
+  "type": "module",
+  "main": "dist/Structures/client/index.js",
+  "scripts": {
+    "build": "rm -rf ./dist && sern build",
+    "tsc:watch": "rm -rf ./dist && tsc -w",
+    "dev": "nodemon ./dist/Structures/client/index.js",
+    "node": "node ./dist/Structures/client/index.js"
+  },
+  "keywords": [
+    "typescript",
+    "sern",
+    "discord.js",
+    "economy"
+  ],
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@napi-rs/canvas": "^1.0.8",
+    "@sern/handler": "^4.2.4",
+    "@sern/publisher": "^1.1.4",
+    "@spark.ts/logger": "^1.4.0",
+    "colorette": "^2.0.20",
+    "discord-api-types": "^0.38.55",
+    "discord.js": "^14.20.0",
+    "nanoid": "^6.0.1",
+    "pg": "^8.23.0",
+    "superagent": "^10.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.1",
+    "@types/superagent": "^8.1.9",
+    "typescript": "^7.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Peter-MJ-Parker/orchard.git"
+  },
+  "imports": {
+    "#plugins": [
+      "./dist/Structures/plugins/index.js"
+    ],
+    "#Orchard": [
+      "./dist/Structures/client/Orchard.js"
+    ],
+    "#utils": [
+      "./dist/Structures/utils/index.js"
+    ]
+  }
+}

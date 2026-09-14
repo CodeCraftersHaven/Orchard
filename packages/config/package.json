@@ -1,0 +1,12 @@
+{
+  "name": "@orchard/config",
+  "version": "1.0.0",
+  "description": "Shared configurations for the Orchard Ecosystem",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "@types/node": "^26.4.1"
+  }
+}

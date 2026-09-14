@@ -1,0 +1,11 @@
+{
+  "name": "@orchard/database",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@orchard/config": "^1.0.0"
+  }
+}

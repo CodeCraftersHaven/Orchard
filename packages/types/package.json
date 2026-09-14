@@ -1,0 +1,9 @@
+{
+    "name": "@orchard/types",
+    "version": "1.0.0",
+    "description": "Shared types for the Orchard Ecosystem",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "license": "ISC",
+    "type": "module"
+}

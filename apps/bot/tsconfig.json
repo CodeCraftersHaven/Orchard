@@ -1,0 +1,31 @@
+{
+    "extends": "./.sern/tsconfig.json",
+    "compilerOptions": {
+    "resolveJsonModule": true,
+    "moduleResolution": "bundler",
+    "target": "esnext",
+    "module": "preserve",
+    "outDir": "dist",
+    "rootDir": "src",
+    "strict": true,
+    "esModuleInterop": true,
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "allowJs": true,
+    "allowUnreachableCode": true,
+    "allowUnusedLabels": true,
+    "exactOptionalPropertyTypes": true,
+    "paths": {
+      "#plugins": ["./src/Structures/plugins/index"],
+      "#BudBot": ["./src/Structures/client/Orchard"],
+      "#utils": ["./src/Structures/utils/index"],
+    },
+    "types": [
+        "node"
+    ]
+  },
+  "include": ["./src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,178 @@
+{
+    "global": [
+        {
+            "id": "1548880350003077251",
+            "application_id": "1548710143724748810",
+            "version": "1548880350003077253",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "birthday",
+            "name_localizations": null,
+            "description": "Manage birthdays in my memory.",
+            "description_localizations": null,
+            "dm_permission": true,
+            "contexts": null,
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 1,
+                    "name": "set",
+                    "name_localizations": null,
+                    "description": "Set a global birthday and notify this server.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 6,
+                            "name": "user-to-add",
+                            "name_localizations": null,
+                            "description": "Select a user.",
+                            "description_localizations": null,
+                            "required": true
+                        },
+                        {
+                            "type": 3,
+                            "name": "date",
+                            "name_localizations": null,
+                            "description": "Birthday in (MM/DD) format.",
+                            "description_localizations": null,
+                            "required": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "edit",
+                    "name_localizations": null,
+                    "description": "Edit a global birthday.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "user-to-edit",
+                            "name_localizations": null,
+                            "description": "Select the user to edit.",
+                            "description_localizations": null,
+                            "required": true,
+                            "autocomplete": true
+                        },
+                        {
+                            "type": 3,
+                            "name": "edit-date",
+                            "name_localizations": null,
+                            "description": "Birthday in (MM/DD) format.",
+                            "description_localizations": null,
+                            "required": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "delete",
+                    "name_localizations": null,
+                    "description": "Delete a global birthday.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 6,
+                            "name": "user-to-delete",
+                            "name_localizations": null,
+                            "description": "Select a user.",
+                            "description_localizations": null
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "enable",
+                    "name_localizations": null,
+                    "description": "Receive birthday announcements in this server.",
+                    "description_localizations": null
+                },
+                {
+                    "type": 1,
+                    "name": "disable",
+                    "name_localizations": null,
+                    "description": "Stop receiving birthday announcements in this server.",
+                    "description_localizations": null
+                },
+                {
+                    "type": 1,
+                    "name": "get",
+                    "name_localizations": null,
+                    "description": "Check a global birthday.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 6,
+                            "name": "user-to-get",
+                            "name_localizations": null,
+                            "description": "Select a user.",
+                            "description_localizations": null
+                        }
+                    ]
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1548880350003077252",
+            "application_id": "1548710143724748810",
+            "version": "1548880350003077254",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "setup",
+            "name_localizations": null,
+            "description": "Configure an Orchard system.",
+            "description_localizations": null,
+            "dm_permission": true,
+            "contexts": null,
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 3,
+                    "name": "system",
+                    "name_localizations": null,
+                    "description": "The Orchard system to configure.",
+                    "description_localizations": null,
+                    "required": true,
+                    "choices": [
+                        {
+                            "name": "Welcome messages",
+                            "name_localizations": null,
+                            "value": "welcome"
+                        },
+                        {
+                            "name": "Birthday messages",
+                            "name_localizations": null,
+                            "value": "birthdays"
+                        }
+                    ]
+                },
+                {
+                    "type": 3,
+                    "name": "action",
+                    "name_localizations": null,
+                    "description": "Enable or disable the selected system.",
+                    "description_localizations": null,
+                    "choices": [
+                        {
+                            "name": "Enable",
+                            "name_localizations": null,
+                            "value": "enable"
+                        },
+                        {
+                            "name": "Disable",
+                            "name_localizations": null,
+                            "value": "disable"
+                        }
+                    ]
+                }
+            ],
+            "nsfw": false
+        }
+    ]
+}
