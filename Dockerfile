@@ -11,7 +11,7 @@ COPY apps/database/package.json ./apps/database/
 COPY apps/api/package.json ./apps/api/
 COPY apps/bot/package.json ./apps/bot/
 COPY apps/dash/package.json ./apps/dash/
-COPY .env .env.development .env.production ./
+COPY .env ./
 
 # Install all dependencies
 RUN npm install --include=dev
