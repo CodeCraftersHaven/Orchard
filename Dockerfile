@@ -16,6 +16,7 @@ COPY .env ./
 # Install all dependencies
 RUN npm install --include=dev
 RUN npm install -g @sern/cli
+RUN npm install -D prisma
 
 # Copy source code
 COPY packages/ ./packages/
