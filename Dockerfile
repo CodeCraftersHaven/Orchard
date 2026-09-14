@@ -24,6 +24,10 @@ COPY apps/api/ ./apps/api/
 COPY apps/bot/ ./apps/bot/
 COPY apps/dash/ ./apps/dash/
 
+# Generate Prisma Client (Done ONCE here)
+RUN npm run database:generate
+RUN npm run database:db-push
+
 # Build shared packages
 RUN npm run config:build
 RUN npm run types:build
@@ -32,10 +36,6 @@ RUN npm run types:build
 RUN npm run api:build
 RUN npm run bot:build
 RUN npm run dash:build
-
-# Generate Prisma Client (Done ONCE here)
-RUN npm run database:generate
-RUN npm run database:db-push
 
 # --- API Production Stage ---
 FROM node:22-alpine AS api
