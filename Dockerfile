@@ -25,13 +25,13 @@ COPY apps/api/ ./apps/api/
 COPY apps/bot/ ./apps/bot/
 COPY apps/dash/ ./apps/dash/
 
-# Generate Prisma Client (Done ONCE here)
-RUN npm run database:generate
-RUN npm run database:db-push
-
 # Build shared packages
 RUN npm run config:build
 RUN npm run types:build
+
+# Generate Prisma Client (Done ONCE here)
+RUN npm run database:generate
+RUN npm run database:db-push
 
 # Build apps
 RUN npm run api:build
