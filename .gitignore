@@ -30,3 +30,4 @@ logs
 Thumbs.db
 apps/website/tsconfig.tsbuildinfo
 .vscode/settings.json
+apps/bot/.sern/command-data-remote.json
