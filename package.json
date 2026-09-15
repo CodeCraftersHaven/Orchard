@@ -27,8 +27,8 @@
     "types:build": "npm exec -w @orchard/types -- tsc"
   },
   "workspaces": [
-    "apps/*",
-    "packages/*"
+    "packages/*",
+    "apps/*"
   ],
   "engines": {
     "node": ">=18.0.0"
