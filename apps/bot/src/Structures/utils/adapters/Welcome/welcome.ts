@@ -6,13 +6,21 @@ import { welcomeEmojis } from './gif.js';
 export type AvatarPosition = 'left' | 'middle' | 'right';
 export const defaultWelcomeBackgroundUrl = 'https://i.imgur.com/RCiKhGl.png';
 
+const loadWelcomeBackground = async (url: string) => {
+  try {
+    return await loadImage(url);
+  } catch {
+    return loadImage(defaultWelcomeBackgroundUrl);
+  }
+};
+
 const option = (array: Array<string>): string => {
   const randomIndex = Math.floor(Math.random() * array.length);
   return array[randomIndex];
 };
 
 const defaultWelcomeMessages = [
-  ':wave: Welcome to {guild}, {member}',
+  '👋 Welcome to {guild}, {member}',
   'We hope you find what you\'re looking for and enjoy your stay, {member}.',
   '{member} has just joined the server.',
   'Welcome {member}! We were waiting for you.',
@@ -128,8 +136,8 @@ export async function welcomeCreate(
   memberCount: number,
   WelcomeChannel: TextChannel,
   channels: { intro: string; roles: string },
-  avatarPosition: AvatarPosition = 'middle',
-  backgroundUrl = defaultWelcomeBackgroundUrl
+  avatarPosition?: AvatarPosition,
+  backgroundUrl?: string
 ) {
   GlobalFonts.registerFromPath(
     './src/Structures/utils/adapters/Welcome/fonts/AlfaSlabOne-Regular.ttf',
@@ -154,7 +162,7 @@ export async function welcomeCreate(
   );
   const resolvedBackgroundUrl = backgroundUrl || guildSettings?.backgroundUrl || defaultWelcomeBackgroundUrl;
 
-  const bgImg = await loadImage(resolvedBackgroundUrl);
+  const bgImg = await loadWelcomeBackground(resolvedBackgroundUrl);
   ctx.drawImage(bgImg, 0, 0, 1024, 500);
 
   const avatarCenterX = resolvedAvatarPosition === 'left' ? 190 : resolvedAvatarPosition === 'right' ? 834 : 512;
@@ -193,6 +201,7 @@ export async function welcomeCreate(
   ctx.fillStyle = '#2d4a22';
   ctx.shadowColor = 'rgba(255, 255, 255, 0.8)';
   ctx.shadowBlur = 6;
+  ctx.font = '36px "Lobster"';
   ctx.fillText(`Member #${memberCount}`, avatarCenterX, avatarCenterY + avatarRadius + 50);
 
   ctx.shadowBlur = 0;
@@ -219,7 +228,7 @@ export async function welcomeCreate(
 
   const content =
     option([
-      `:wave: Welcome to ${guildName}, ${member}`,
+      `👋 Welcome to ${guildName}, ${member}`,
       `We hope you find what you're looking for and that you enjoy your stay, ${member}.`,
       `${member} is here to kick ass and chew gum, but ${member} has run out of gum.`,
       `${member} has just joined. Save your bananas.`,

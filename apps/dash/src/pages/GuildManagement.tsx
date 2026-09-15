@@ -3,12 +3,16 @@ import type { GuildChannel, GuildSettings } from "@orchard/types";
 import { Link, useParams } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { Spinner } from "../components/Spinner";
+import { useAuth } from "../context/AuthContext";
 import { Unauthorized } from "./Unauthorized";
 import {
     ApiError,
+    avatarUrl,
     getGuildSettings,
     saveGuildSettings,
 } from "../lib/api";
+
+const defaultWelcomeBackgroundUrl = "https://i.imgur.com/RCiKhGl.png";
 
 const channelFields: Array<{ key: keyof GuildSettings; label: string; description: string }> = [
     { key: "welcomeC", label: "Welcome messages", description: "Where new member welcome messages are sent." },
@@ -28,7 +32,7 @@ const systemGroups = {
     welcome: {
         label: "Welcome",
         description: "Greet new members and customize their welcome experience.",
-        fields: ["welcomeC", "leaveC"] as Array<keyof GuildSettings>,
+        fields: ["welcomeC"] as Array<keyof GuildSettings>,
     },
     birthdays: {
         label: "Birthdays",
@@ -77,6 +81,7 @@ function channelOptions(channels: GuildChannel[]) {
 
 export function GuildManagement() {
     const { guildId, system } = useParams();
+    const { user } = useAuth();
     const activeSystem = system && system in systemGroups ? system as SystemKey : undefined;
     const [guildName, setGuildName] = useState("");
     const [channels, setChannels] = useState<GuildChannel[]>([]);
@@ -87,6 +92,7 @@ export function GuildManagement() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [unauthorized, setUnauthorized] = useState(false);
+    const [backgroundImageFailed, setBackgroundImageFailed] = useState(false);
 
     useEffect(() => {
         if (!guildId) return;
@@ -110,6 +116,22 @@ export function GuildManagement() {
             })
             .finally(() => setLoading(false));
     }, [guildId]);
+
+    const welcomeBackgroundUrl = settings.welcomeBackgroundUrl?.trim() || defaultWelcomeBackgroundUrl;
+    const previewBackgroundUrl = backgroundImageFailed ? defaultWelcomeBackgroundUrl : welcomeBackgroundUrl;
+    const previewAvatarUrl = user ? avatarUrl(user) : "https://cdn.discordapp.com/embed/avatars/0.png";
+    const avatarPosition = settings.welcomeAvatarPosition ?? "middle";
+    const avatarPositionClass = avatarPosition === "left"
+        ? "left-[18.5%]"
+        : avatarPosition === "right"
+            ? "left-[81.5%]"
+            : "left-1/2";
+    const welcomeChannel = channels.find((channel) => channel.id === settings.welcomeC);
+    const introChannel = channels.find((channel) => channel.id === settings.introC);
+    const rolesChannel = channels.find((channel) => channel.id === settings.rolesChannelId);
+    const welcomePreviewMessage = (botWelcomeMessages[0]?.trim() || `👋 Welcome to ${guildName || "your server"}, {member}`)
+        .replaceAll("{guild}", guildName || "your server")
+        .replaceAll("{member}", `@${user?.username || "new-member"}`);
 
     if (unauthorized) return <Unauthorized />;
 
@@ -205,6 +227,19 @@ export function GuildManagement() {
                                     </select>
                                 </label>
                             ))}
+                            {activeSystem === "welcome" && <label className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <span className="block font-semibold text-white">Welcome avatar position</span>
+                                <span className="mt-1 block text-sm text-slate-400">Choose where the member avatar appears in the welcome image.</span>
+                                <select
+                                    value={settings.welcomeAvatarPosition ?? "middle"}
+                                    onChange={(event) => updateSetting("welcomeAvatarPosition", event.target.value)}
+                                    className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white outline-none transition focus:border-discord-blurple"
+                                >
+                                    <option value="left">Left</option>
+                                    <option value="middle">Middle</option>
+                                    <option value="right">Right</option>
+                                </select>
+                            </label>}
                         </section>}
 
                         {activeSystem === "birthdays" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -238,17 +273,56 @@ export function GuildManagement() {
                         </section>}
 
                         {activeSystem === "welcome" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
-                            <span className="block font-semibold text-white">Welcome avatar position</span>
-                            <span className="mt-1 block text-sm text-slate-400">Choose where the member avatar appears in the welcome image.</span>
-                            <select
-                                value={settings.welcomeAvatarPosition ?? "middle"}
-                                onChange={(event) => updateSetting("welcomeAvatarPosition", event.target.value)}
-                                className="mt-4 w-full max-w-sm rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white outline-none transition focus:border-discord-blurple"
-                            >
-                                <option value="left">Left</option>
-                                <option value="middle">Middle</option>
-                                <option value="right">Right</option>
-                            </select>
+                            <label htmlFor="welcome-background" className="block font-semibold text-white">Welcome background image</label>
+                            <span className="mt-1 block text-sm text-slate-400">Use a publicly accessible HTTPS image URL. Leave blank to use Orchard&apos;s default.</span>
+                            <input
+                                id="welcome-background"
+                                type="url"
+                                value={settings.welcomeBackgroundUrl ?? ""}
+                                onChange={(event) => {
+                                    setBackgroundImageFailed(false);
+                                    updateSetting("welcomeBackgroundUrl", event.target.value);
+                                }}
+                                placeholder="https://example.com/welcome-background.png"
+                                className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-discord-blurple"
+                            />
+                            <div className="mt-5 overflow-hidden rounded-xl border border-[#1e1f22] bg-[#313338] text-[#dbdee1] shadow-xl">
+                                <div className="flex items-center gap-2 border-b border-[#1e1f22] bg-[#2b2d31] px-4 py-3">
+                                    <span className="text-xl text-[#949ba4]">#</span>
+                                    <span className="font-semibold text-white">{welcomeChannel?.name || "welcome"}</span>
+                                    <span className="ml-auto text-xs text-[#949ba4]">Example message</span>
+                                </div>
+                                <div className="p-4 sm:p-5">
+                                    <div className="flex gap-3">
+                                        <img src="https://i.imgur.com/vE1jlXv.png" alt="Pomona bot avatar" className="mt-0.5 h-10 w-10 shrink-0 rounded-full bg-[#5865f2] object-cover" />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                                                <span className="font-semibold text-white">Pomona</span>
+                                                <span className="rounded bg-[#5865f2] px-1 py-0.5 text-[0.65rem] font-semibold uppercase text-white">BOT</span>
+                                                <span className="text-xs text-[#949ba4]">Today at 12:00 PM</span>
+                                            </div>
+                                            <p className="mt-1 whitespace-pre-wrap break-words text-[0.95rem] leading-6 text-[#dbdee1]">{welcomePreviewMessage}</p>
+                                            <p className="mt-1 text-[0.8rem] leading-5 text-[#b5bac1]">You may now go to <span className="text-[#00a8fc]">#{introChannel?.name || "introductions"}</span> to introduce yourself and <span className="text-[#00a8fc]">#{rolesChannel?.name || "roles"}</span> to get some roles!</p>
+                                        </div>
+                                    </div>
+                                    <div className="relative mt-4 aspect-[1024/500] w-full overflow-hidden rounded-md bg-[#1e1f22]">
+                                        <img src={previewBackgroundUrl} alt="Welcome background preview" className="absolute inset-0 h-full w-full object-cover" onError={() => setBackgroundImageFailed(true)} />
+                                        <div className="absolute inset-0 bg-black/10" />
+                                        <img
+                                            src={previewAvatarUrl}
+                                            alt="Your avatar in the welcome preview"
+                                            className={`absolute top-1/2 h-[34%] aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-4 border-white object-cover shadow-lg transition-[left] duration-200 ${avatarPositionClass}`}
+                                        />
+                                        <div className={`absolute top-[82%] -translate-x-1/2 text-center text-[clamp(0.65rem,2vw,1.1rem)] font-semibold text-[#2d4a22] drop-shadow-[0_0_5px_rgba(255,255,255,0.8)] transition-[left] duration-200 ${avatarPositionClass}`}>
+                                            Member #42
+                                        </div>
+                                    </div>
+                                    <button type="button" className="mt-3 rounded-[3px] bg-[#4e5058] px-3 py-1.5 text-sm font-medium text-white">
+                                        👋 Wave to say hi!
+                                    </button>
+                                </div>
+                            </div>
+                            <span className="mt-2 block text-xs text-slate-500">This Discord-style preview includes the greeting, image, and wave button Pomona sends.</span>
                         </section>}
 
                         {activeSystem === "welcome" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -288,18 +362,6 @@ export function GuildManagement() {
                             )}
                         </section>}
 
-                        {activeSystem === "welcome" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
-                            <label htmlFor="welcome-background" className="block font-semibold text-white">Welcome background image</label>
-                            <span className="mt-1 block text-sm text-slate-400">Use a publicly accessible HTTPS image URL. Leave blank to use Orchard's default.</span>
-                            <input
-                                id="welcome-background"
-                                type="url"
-                                value={settings.welcomeBackgroundUrl ?? ""}
-                                onChange={(event) => updateSetting("welcomeBackgroundUrl", event.target.value)}
-                                placeholder="https://example.com/welcome-background.png"
-                                className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-discord-blurple"
-                            />
-                        </section>}
                     </>
                 )}
             </main>

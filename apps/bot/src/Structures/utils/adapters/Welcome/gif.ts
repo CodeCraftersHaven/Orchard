@@ -68,11 +68,11 @@ export async function sticker(interaction: ButtonInteraction<CacheType>, memberI
     if (memberQuestion.random && memberQuestion.messagesArray.length >= 2) {
       hello = memberQuestion.messagesArray[option(memberQuestion.messagesArray)];
     } else {
-      hello = memberQuestion.singleMessage ?? `:wave: Welcome to ${interaction.guild?.name}, <@${memberId}>`;
+      hello = memberQuestion.singleMessage ?? `👋 Welcome to ${interaction.guild?.name}, <@${memberId}>`;
     }
   } else {
     const contents = [
-      `:wave: Welcome to ${interaction.guild?.name}, <@${memberId}>`,
+      `👋 Welcome to ${interaction.guild?.name}, <@${memberId}>`,
       `Hi <@${memberId}>! Welcome to our community! Please make yourself at home!`,
       `👋 Hello <@${memberId}>`,
     ];
