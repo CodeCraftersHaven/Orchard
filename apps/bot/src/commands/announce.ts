@@ -1,6 +1,6 @@
 import { IntegrationContextType, publishConfig } from "#plugins";
 import { commandModule, CommandType } from "@sern/handler";
-import { ApplicationCommandOptionType, ChannelType, PermissionFlagsBits, TextChannel } from "discord.js";
+import { ApplicationCommandOptionType, ChannelType, MessageFlags, PermissionFlagsBits, TextChannel } from "discord.js";
 
 export default commandModule({
     type: CommandType.Both,
@@ -40,10 +40,11 @@ export default commandModule({
             const message = channelMention ? args.slice(1).join(" ") : args.join(" ");
             if (channel?.isTextBased()) {
                 await channel.send({
+                    content: `@<${ctx.guildId}>`,
                     embeds: [
                         {
                             author: {
-                                name: ctx.message.author.username,
+                                name: ctx.message.author.displayName,
                                 icon_url: ctx.message.author.displayAvatarURL()
                             },
                             description: message,
@@ -58,17 +59,19 @@ export default commandModule({
             const channel = (ctx.interaction.options.getChannel("channel", false) || ctx.channel) as TextChannel;
             if (channel.isTextBased()) {
                 await channel.send({
+                    content: `@<${ctx.guildId}>`,
                     embeds: [
                         {
                             author: {
-                                name: ctx.interaction.user.username,
+                                name: ctx.interaction.user.displayName,
                                 icon_url: ctx.interaction.user.displayAvatarURL()
                             },
                             description: message,
                             timestamp: new Date().toISOString()
                         }
                     ]
-                }); channel
+                }); 
+                await ctx.interaction.reply({ content: "Announcement sent!", flags: MessageFlags.Ephemeral });
             }
         }
     }
