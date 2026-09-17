@@ -14,6 +14,8 @@ import {
     createReactionRolePanel,
     deleteReactionRolePanel,
     createVerificationPanel,
+    getSetupNotes,
+    saveSetupNotes,
     saveGuildSettings,
     disableGuildSystem,
     getEconomyItems,
@@ -87,6 +89,52 @@ const systemGroups = {
 } as const;
 
 type SystemKey = keyof typeof systemGroups;
+
+const systemNoteOptions: Partial<Record<SystemKey, Array<{ key: string; label: string }>>> = {
+    welcome: [
+        { key: "welcomeC", label: "Welcome channel" },
+        { key: "welcomeMode", label: "Welcome format" },
+        { key: "welcomeAvatarPosition", label: "Avatar position" },
+        { key: "welcomeBackgroundUrl", label: "Welcome background" },
+        { key: "welcomeContent", label: "Welcome content" },
+    ],
+    birthdays: [
+        { key: "birthdayAnnounceChan", label: "Birthday announcements" },
+        { key: "birthdayLogChannelId", label: "Birthday logs" },
+    ],
+    counting: [
+        { key: "countingChannel", label: "Counting channel" },
+        { key: "countingEnabled", label: "Counting system" },
+    ],
+    serverStats: [
+        { key: "statsCategoryId", label: "Category placement" },
+        { key: "statsAllChannel", label: "Total Members channel" },
+        { key: "statsUsersChannel", label: "Users channel" },
+        { key: "statsBotsChannel", label: "Bots channel" },
+        { key: "statsCreateMissing", label: "Create missing channels" },
+    ],
+    leveling: [
+        { key: "levelEnabled", label: "Leveling system" },
+        { key: "levelFirstReward", label: "1st place reward" },
+        { key: "levelSecondReward", label: "2nd place reward" },
+        { key: "levelThirdReward", label: "3rd place reward" },
+        { key: "levelParticipantReward", label: "Participation reward" },
+    ],
+    economy: [
+        { key: "economyCurrencyName", label: "Currency name" },
+        { key: "economyBankName", label: "Bank name" },
+        { key: "economyCurrencyImageUrl", label: "Currency image" },
+        { key: "economyBankImageUrl", label: "Bank image" },
+        { key: "economyItems", label: "Economy items" },
+    ],
+    reactionRoles: [{ key: "reactionRolePanels", label: "Reaction role panels" }],
+    verification: [
+        { key: "verificationChannelId", label: "Verification channel" },
+        { key: "introC", label: "Intro channel" },
+        { key: "verifiedRole", label: "Verified role" },
+        { key: "nonVerifiedRoleId", label: "Non-verified role" },
+    ],
+};
 
 function channelOptions(channels: GuildChannel[]) {
     const grouped = new Map<string, GuildChannel[]>();
@@ -204,6 +252,9 @@ export function GuildManagement() {
     const [statsBotsName, setStatsBotsName] = useState("Bots");
     const [statsCreateMissing, setStatsCreateMissing] = useState(false);
     const [statsPlacement, setStatsPlacement] = useState("");
+    const [systemNote, setSystemNote] = useState("");
+    const [optionNotes, setOptionNotes] = useState<Record<string, string>>({});
+    const [notesSaving, setNotesSaving] = useState(false);
 
     useEffect(() => {
         if (!guildId) return;
@@ -244,6 +295,13 @@ export function GuildManagement() {
     }, [guildId, activeSystem]);
 
     useEffect(() => {
+        if (!guildId || !activeSystem) return;
+        getSetupNotes(guildId, activeSystem)
+            .then((notes) => { setSystemNote(notes.note); setOptionNotes(notes.options); })
+            .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load setup notes."));
+    }, [guildId, activeSystem]);
+
+    useEffect(() => {
         if (!guildId || activeSystem !== "reactionRoles") {
             setReactionError(null);
             return;
@@ -281,6 +339,7 @@ export function GuildManagement() {
     const welcomePreviewMessage = (botWelcomeMessages[0]?.trim() || `👋 Welcome to ${guildName || "your server"}, {member}`)
         .replaceAll("{guild}", guildName || "your server")
         .replaceAll("{member}", `@${user?.username || "new-member"}`);
+    const noteOptions = activeSystem ? systemNoteOptions[activeSystem] ?? [] : [];
 
     if (unauthorized) return <Unauthorized />;
 
@@ -313,6 +372,19 @@ export function GuildManagement() {
             setError(err instanceof ApiError ? err.message : "Failed to save guild settings.");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const saveNotes = async () => {
+        if (!guildId || !activeSystem) return;
+        setNotesSaving(true);
+        try {
+            await saveSetupNotes(guildId, activeSystem, { note: systemNote, options: optionNotes });
+            setNotice("Setup notes saved.");
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to save setup notes.");
+        } finally {
+            setNotesSaving(false);
         }
     };
 
@@ -466,6 +538,24 @@ export function GuildManagement() {
                             </label>}
                         </section>}
 
+                        {activeSystem && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
+                            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                                <div>
+                                    <h2 className="font-semibold text-white">Setup notes</h2>
+                                    <p className="mt-1 text-sm text-slate-400">Add a note for this system and each option. Notes are saved for administrators managing this guild.</p>
+                                </div>
+                                <button type="button" onClick={() => void saveNotes()} disabled={notesSaving} className="rounded-lg bg-discord-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{notesSaving ? "Saving…" : "Save notes"}</button>
+                            </div>
+                            <label className="mt-4 block text-sm text-slate-300">System note
+                                <textarea value={systemNote} onChange={(event) => setSystemNote(event.target.value)} rows={2} placeholder={`Notes about ${systemGroups[activeSystem].label.toLowerCase()}`} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                            </label>
+                            {noteOptions.length > 0 && <div className="mt-4 grid gap-4 md:grid-cols-2">
+                                {noteOptions.map((option) => <label key={option.key} className="block text-sm text-slate-300">{option.label} note
+                                    <textarea value={optionNotes[option.key] ?? ""} onChange={(event) => setOptionNotes((current) => ({ ...current, [option.key]: event.target.value }))} rows={2} placeholder={`Notes about ${option.label.toLowerCase()}`} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                </label>)}
+                            </div>}
+                        </section>}
+
                         {activeSystem === "reactionRoles" && <section className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
                             <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
                                 <h2 className="font-semibold text-white">New reaction role embed</h2>
@@ -588,6 +678,11 @@ export function GuildManagement() {
                             <div className="mt-4 grid gap-4 md:grid-cols-3">
                                 <label className="block text-sm text-slate-300">Verification channel
                                     <select value={verificationChannelId} onChange={(event) => setVerificationChannelId(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                        {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                    </select>
+                                </label>
+                                <label className="block text-sm text-slate-300">Intro channel
+                                    <select value={String(settings.introC ?? "")} onChange={(event) => updateSetting("introC", event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
                                         {channelOptions(channels.filter((channel) => channel.type === 0))}
                                     </select>
                                 </label>

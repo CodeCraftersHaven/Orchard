@@ -159,6 +159,59 @@ export default async function guildRoutes(fastify: FastifyInstance) {
     },
   );
 
+  fastify.get<{ Params: { guildId: string; system: string } }>(
+    "/:guildId/setup-notes/:system",
+    { preHandler: fastify.authenticate },
+    async (request, reply) => {
+      const { guildId, system } = request.params;
+      const userGuilds = await getCurrentUserGuilds(request.user.accessToken);
+      const userGuild = userGuilds.find((guild) => guild.id === guildId);
+      if (!userGuild || !hasAdministratorPermission(userGuild)) return reply.code(403).send({ error: "Administrator permissions are required." });
+      const [panel, options] = await Promise.all([
+        fastify.prisma.systemSetupPanel.findUnique({ where: { gID_system: { gID: guildId, system } }, select: { note: true } }),
+        fastify.prisma.systemSetupOptionNote.findMany({ where: { gID: guildId, system }, select: { option: true, note: true } }),
+      ]);
+      return { note: panel?.note ?? "", options: Object.fromEntries(options.map((entry) => [entry.option, entry.note])) };
+    },
+  );
+
+  fastify.put<{
+    Params: { guildId: string; system: string };
+    Body: { note?: string; options?: Record<string, string> };
+  }>(
+    "/:guildId/setup-notes/:system",
+    { preHandler: fastify.authenticate },
+    async (request, reply) => {
+      const { guildId, system } = request.params;
+      const userGuilds = await getCurrentUserGuilds(request.user.accessToken);
+      const userGuild = userGuilds.find((guild) => guild.id === guildId);
+      if (!userGuild || !hasAdministratorPermission(userGuild)) return reply.code(403).send({ error: "Administrator permissions are required." });
+      const note = typeof request.body.note === "string" ? request.body.note.trim() : "";
+      const options = Object.entries(request.body.options ?? {}).filter(([, value]) => typeof value === "string").map(([option, value]) => ({
+        id: `${guildId}-${system}-${option}`,
+        gID: guildId,
+        system,
+        option,
+        note: value.trim(),
+      }));
+      await fastify.prisma.$transaction(async (transaction) => {
+        await transaction.systemSetupPanel.upsert({
+          where: { gID_system: { gID: guildId, system } },
+          update: { note },
+          create: { id: `${guildId}-${system}`, gID: guildId, system, channelId: "", messageId: "", note },
+        });
+        for (const optionNote of options) {
+          await transaction.systemSetupOptionNote.upsert({
+            where: { gID_system_option: { gID: guildId, system, option: optionNote.option } },
+            update: { note: optionNote.note },
+            create: optionNote,
+          });
+        }
+      });
+      return { note, options: Object.fromEntries(options.map((entry) => [entry.option, entry.note])) };
+    },
+  );
+
   fastify.post<{
     Params: { guildId: string };
     Body: { channelId?: string; verifiedRole?: string; nonVerifiedRoleId?: string };
@@ -464,6 +517,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
 
         await fastify.prisma.$transaction(async (transaction) => {
           await transaction.systemSetupPanel.deleteMany({ where: { gID: guildId, system } });
+          await transaction.systemSetupOptionNote.deleteMany({ where: { gID: guildId, system } });
           if (system === "welcome") await transaction.welcomeSettings.deleteMany({ where: { gID: guildId } });
           if (system === "birthdays") {
             await transaction.birthdaySubscription.deleteMany({ where: { gID: guildId } });

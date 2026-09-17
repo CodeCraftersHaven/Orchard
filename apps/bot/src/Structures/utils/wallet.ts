@@ -23,7 +23,7 @@ export async function buildWalletContainer(prisma: PrismaClient, viewer: WalletV
         boost ? `Boost: **${boost.recipe}** at **${Math.round(boost.multiplier * 100 - 100)}%** until <t:${Math.floor(boost.expiresAt.getTime() / 1000)}:R>` : 'Boost: none',
     ].join('\n');
     const now = Date.now();
-    const hasReadyActivity = Boolean(plot?.readyAt.getTime() <= now || craft?.readyAt.getTime() <= now);
+    const hasReadyActivity = Boolean(plot?.readyAt.getTime()! <= now || craft?.readyAt.getTime()! <= now);
 
     const container = new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## ${viewer.username}'s economy profile`))

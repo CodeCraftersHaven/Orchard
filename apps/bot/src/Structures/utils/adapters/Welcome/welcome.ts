@@ -41,7 +41,7 @@ export async function welcomeCreate(
   member: GuildMember,
   guildName: string,
   memberCount: number,
-  WelcomeChannel: TextChannel,
+  WelcomeChannel: TextChannel | null | undefined,
   channels: { intro: string; roles: string },
   avatarPosition?: AvatarPosition,
   backgroundUrl?: string
@@ -139,6 +139,7 @@ export async function welcomeCreate(
   avatarPosition?: AvatarPosition,
   backgroundUrl?: string
 ) {
+  if (!WelcomeChannel?.isTextBased()) return;
   GlobalFonts.registerFromPath(
     './src/Structures/utils/adapters/Welcome/fonts/AlfaSlabOne-Regular.ttf',
     'alfa-regular'

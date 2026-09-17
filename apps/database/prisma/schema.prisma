@@ -36,6 +36,16 @@ model SystemSetupPanel {
     @@unique([gID, system])
 }
 
+model SystemSetupOptionNote {
+    id       String @id
+    gID      String
+    system   String
+    option   String
+    note     String @default("")
+
+    @@unique([gID, system, option])
+}
+
 // Economy
 model MoneyUser {
     id       String        @id
