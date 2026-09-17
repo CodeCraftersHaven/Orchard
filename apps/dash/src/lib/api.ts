@@ -103,10 +103,6 @@ export const createReactionRolePanel = (guildId: string, panel: { channelId: str
   });
 export const deleteReactionRolePanel = (guildId: string, panelId: string) =>
   apiFetch<{ deleted: boolean }>(`/guilds/${guildId}/reaction-roles/${panelId}`, { method: "DELETE" });
-export const getSetupNotes = (guildId: string, system: string) =>
-  apiFetch<{ note: string; options: Record<string, string> }>(`/guilds/${guildId}/setup-notes/${system}`);
-export const saveSetupNotes = (guildId: string, system: string, notes: { note: string; options: Record<string, string> }) =>
-  apiFetch<{ note: string; options: Record<string, string> }>(`/guilds/${guildId}/setup-notes/${system}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(notes) });
 export const createVerificationPanel = (guildId: string, settings: { channelId: string; verifiedRole: string; nonVerifiedRoleId: string }) =>
   apiFetch<{ messageId: string }>(`/guilds/${guildId}/verification`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
 export const getEconomyItems = (guildId: string) => apiFetch<EconomyItemDefinition[]>(`/guilds/${guildId}/economy/items`);

@@ -14,8 +14,6 @@ import {
     createReactionRolePanel,
     deleteReactionRolePanel,
     createVerificationPanel,
-    getSetupNotes,
-    saveSetupNotes,
     saveGuildSettings,
     disableGuildSystem,
     getEconomyItems,
@@ -89,52 +87,6 @@ const systemGroups = {
 } as const;
 
 type SystemKey = keyof typeof systemGroups;
-
-const systemNoteOptions: Partial<Record<SystemKey, Array<{ key: string; label: string }>>> = {
-    welcome: [
-        { key: "welcomeC", label: "Welcome channel" },
-        { key: "welcomeMode", label: "Welcome format" },
-        { key: "welcomeAvatarPosition", label: "Avatar position" },
-        { key: "welcomeBackgroundUrl", label: "Welcome background" },
-        { key: "welcomeContent", label: "Welcome content" },
-    ],
-    birthdays: [
-        { key: "birthdayAnnounceChan", label: "Birthday announcements" },
-        { key: "birthdayLogChannelId", label: "Birthday logs" },
-    ],
-    counting: [
-        { key: "countingChannel", label: "Counting channel" },
-        { key: "countingEnabled", label: "Counting system" },
-    ],
-    serverStats: [
-        { key: "statsCategoryId", label: "Category placement" },
-        { key: "statsAllChannel", label: "Total Members channel" },
-        { key: "statsUsersChannel", label: "Users channel" },
-        { key: "statsBotsChannel", label: "Bots channel" },
-        { key: "statsCreateMissing", label: "Create missing channels" },
-    ],
-    leveling: [
-        { key: "levelEnabled", label: "Leveling system" },
-        { key: "levelFirstReward", label: "1st place reward" },
-        { key: "levelSecondReward", label: "2nd place reward" },
-        { key: "levelThirdReward", label: "3rd place reward" },
-        { key: "levelParticipantReward", label: "Participation reward" },
-    ],
-    economy: [
-        { key: "economyCurrencyName", label: "Currency name" },
-        { key: "economyBankName", label: "Bank name" },
-        { key: "economyCurrencyImageUrl", label: "Currency image" },
-        { key: "economyBankImageUrl", label: "Bank image" },
-        { key: "economyItems", label: "Economy items" },
-    ],
-    reactionRoles: [{ key: "reactionRolePanels", label: "Reaction role panels" }],
-    verification: [
-        { key: "verificationChannelId", label: "Verification channel" },
-        { key: "introC", label: "Intro channel" },
-        { key: "verifiedRole", label: "Verified role" },
-        { key: "nonVerifiedRoleId", label: "Non-verified role" },
-    ],
-};
 
 function channelOptions(channels: GuildChannel[]) {
     const grouped = new Map<string, GuildChannel[]>();
@@ -252,9 +204,7 @@ export function GuildManagement() {
     const [statsBotsName, setStatsBotsName] = useState("Bots");
     const [statsCreateMissing, setStatsCreateMissing] = useState(false);
     const [statsPlacement, setStatsPlacement] = useState("");
-    const [systemNote, setSystemNote] = useState("");
-    const [optionNotes, setOptionNotes] = useState<Record<string, string>>({});
-    const [notesSaving, setNotesSaving] = useState(false);
+    const [setupNotes, setSetupNotes] = useState<Record<string, string>>({});
 
     useEffect(() => {
         if (!guildId) return;
@@ -295,13 +245,6 @@ export function GuildManagement() {
     }, [guildId, activeSystem]);
 
     useEffect(() => {
-        if (!guildId || !activeSystem) return;
-        getSetupNotes(guildId, activeSystem)
-            .then((notes) => { setSystemNote(notes.note); setOptionNotes(notes.options); })
-            .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load setup notes."));
-    }, [guildId, activeSystem]);
-
-    useEffect(() => {
         if (!guildId || activeSystem !== "reactionRoles") {
             setReactionError(null);
             return;
@@ -339,8 +282,6 @@ export function GuildManagement() {
     const welcomePreviewMessage = (botWelcomeMessages[0]?.trim() || `👋 Welcome to ${guildName || "your server"}, {member}`)
         .replaceAll("{guild}", guildName || "your server")
         .replaceAll("{member}", `@${user?.username || "new-member"}`);
-    const noteOptions = activeSystem ? systemNoteOptions[activeSystem] ?? [] : [];
-
     if (unauthorized) return <Unauthorized />;
 
     const updateSetting = (key: keyof GuildSettings, value: string | boolean | number) => {
@@ -372,19 +313,6 @@ export function GuildManagement() {
             setError(err instanceof ApiError ? err.message : "Failed to save guild settings.");
         } finally {
             setSaving(false);
-        }
-    };
-
-    const saveNotes = async () => {
-        if (!guildId || !activeSystem) return;
-        setNotesSaving(true);
-        try {
-            await saveSetupNotes(guildId, activeSystem, { note: systemNote, options: optionNotes });
-            setNotice("Setup notes saved.");
-        } catch (err) {
-            setError(err instanceof ApiError ? err.message : "Failed to save setup notes.");
-        } finally {
-            setNotesSaving(false);
         }
     };
 
@@ -521,6 +449,13 @@ export function GuildManagement() {
                                     >
                                         {channelOptions(channels.filter((channel) => channel.type === 0))}
                                     </select>
+                                    {((activeSystem === "welcome" && field.key === "welcomeC") || activeSystem === "birthdays" || (activeSystem === "counting" && field.key === "countingChannel")) && <textarea
+                                        value={setupNotes[field.key] ?? ""}
+                                        onChange={(event) => setSetupNotes((current) => ({ ...current, [field.key]: event.target.value }))}
+                                        rows={2}
+                                        placeholder={`Setup note for ${field.label.toLowerCase()}`}
+                                        className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white"
+                                    />}
                                 </label>
                             ))}
                             {activeSystem === "welcome" && <label className="rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -536,24 +471,6 @@ export function GuildManagement() {
                                     <option value="right">Right</option>
                                 </select>
                             </label>}
-                        </section>}
-
-                        {activeSystem && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
-                            <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-                                <div>
-                                    <h2 className="font-semibold text-white">Setup notes</h2>
-                                    <p className="mt-1 text-sm text-slate-400">Add a note for this system and each option. Notes are saved for administrators managing this guild.</p>
-                                </div>
-                                <button type="button" onClick={() => void saveNotes()} disabled={notesSaving} className="rounded-lg bg-discord-green px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{notesSaving ? "Saving…" : "Save notes"}</button>
-                            </div>
-                            <label className="mt-4 block text-sm text-slate-300">System note
-                                <textarea value={systemNote} onChange={(event) => setSystemNote(event.target.value)} rows={2} placeholder={`Notes about ${systemGroups[activeSystem].label.toLowerCase()}`} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
-                            </label>
-                            {noteOptions.length > 0 && <div className="mt-4 grid gap-4 md:grid-cols-2">
-                                {noteOptions.map((option) => <label key={option.key} className="block text-sm text-slate-300">{option.label} note
-                                    <textarea value={optionNotes[option.key] ?? ""} onChange={(event) => setOptionNotes((current) => ({ ...current, [option.key]: event.target.value }))} rows={2} placeholder={`Notes about ${option.label.toLowerCase()}`} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
-                                </label>)}
-                            </div>}
                         </section>}
 
                         {activeSystem === "reactionRoles" && <section className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
@@ -672,30 +589,41 @@ export function GuildManagement() {
                             </div>
                         </section>}
 
-                        {activeSystem === "verification" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
-                            <h2 className="font-semibold text-white">Verification panel</h2>
-                            <p className="mt-1 text-sm text-slate-400">Post a panel that assigns the verified role when a member reacts with any emoji.</p>
-                            <div className="mt-4 grid gap-4 md:grid-cols-3">
-                                <label className="block text-sm text-slate-300">Verification channel
-                                    <select value={verificationChannelId} onChange={(event) => setVerificationChannelId(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
-                                        {channelOptions(channels.filter((channel) => channel.type === 0))}
-                                    </select>
-                                </label>
-                                <label className="block text-sm text-slate-300">Intro channel
-                                    <select value={String(settings.introC ?? "")} onChange={(event) => updateSetting("introC", event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
-                                        {channelOptions(channels.filter((channel) => channel.type === 0))}
-                                    </select>
-                                </label>
-                                <label className="block text-sm text-slate-300">Verified role
-                                    <select value={verificationVerifiedRole} onChange={(event) => setVerificationVerifiedRole(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
-                                        <option value="">Choose a role</option>{guildRoles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}
-                                    </select>
-                                </label>
-                                <label className="block text-sm text-slate-300">Non-verified role
-                                    <select value={verificationNonVerifiedRole} onChange={(event) => setVerificationNonVerifiedRole(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
-                                        <option value="">Choose a role</option>{guildRoles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}
-                                    </select>
-                                </label>
+                        {activeSystem === "verification" && <section className="mt-5 grid gap-5 md:grid-cols-2">
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Verification channel</h2>
+                                <p className="mt-1 text-sm text-slate-400">Where the verification panel will be posted.</p>
+                                <select value={verificationChannelId} onChange={(event) => setVerificationChannelId(event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                    {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                </select>
+                                <textarea value={setupNotes.verificationChannelId ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, verificationChannelId: event.target.value }))} rows={2} placeholder="Setup note for verification channel" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Intro channel</h2>
+                                <p className="mt-1 text-sm text-slate-400">Where verified members are directed to introduce themselves.</p>
+                                <select value={String(settings.introC ?? "")} onChange={(event) => updateSetting("introC", event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                    {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                </select>
+                                <textarea value={setupNotes.introC ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, introC: event.target.value }))} rows={2} placeholder="Setup note for intro channel" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Verified role</h2>
+                                <p className="mt-1 text-sm text-slate-400">Role granted when a member reacts to the panel.</p>
+                                <select value={verificationVerifiedRole} onChange={(event) => setVerificationVerifiedRole(event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                    <option value="">Choose a role</option>{guildRoles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}
+                                </select>
+                                <textarea value={setupNotes.verifiedRole ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, verifiedRole: event.target.value }))} rows={2} placeholder="Setup note for verified role" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Non-verified role</h2>
+                                <p className="mt-1 text-sm text-slate-400">Role removed when a member becomes verified.</p>
+                                <select value={verificationNonVerifiedRole} onChange={(event) => setVerificationNonVerifiedRole(event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                    <option value="">Choose a role</option>{guildRoles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}
+                                </select>
+                                <textarea value={setupNotes.nonVerifiedRoleId ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, nonVerifiedRoleId: event.target.value }))} rows={2} placeholder="Setup note for non-verified role" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                            </div>
+                            <div className="md:col-span-2">
+                                <p className="text-sm text-slate-400">React with any emoji to verify and unlock the server.</p>
                             </div>
                             <button type="button" onClick={() => void saveVerificationPanel()} disabled={verificationSaving || Boolean(settings.verificationPanelMessageId)} className="mt-5 rounded-lg bg-discord-green px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{verificationSaving ? "Posting panel…" : settings.verificationPanelMessageId ? "Panel already posted" : "Create verification panel"}</button>
                         </section>}
