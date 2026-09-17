@@ -20,8 +20,6 @@ export enum IntegrationContextType {
   PRIVATE_CHANNEL = 2
 }
 
-export function getUser() { }
-
 export const owners = env.OWNER_IDS.split(',');
 /**
  *
@@ -29,7 +27,7 @@ export const owners = env.OWNER_IDS.split(',');
  * @description Waits a certain time before going to next function.
  */
 export async function delay(time: number) {
-  (await import('node:timers/promises')).setTimeout(time * 1000);
+  await (await import('node:timers/promises')).setTimeout(time * 1000);
 }
 
 export function getRandomMessage(names: string[]): string {
@@ -167,6 +165,17 @@ export function createModal(custom_id: string, title: string, components: TextIn
   });
 }
 
+export async function getEmoji(name: string): Promise<string> {
+  const client = Service('@sern/client');
+  const application = client?.application;
+  if (!application) return name;
+
+  const emojis = await application.emojis.fetch();
+  const emoji = emojis.find(candidate => candidate.name === name);
+  if (!emoji) return name;
+
+  return `<${emoji.animated ? 'a' : ''}:${emoji.name}:${emoji.id}>`;
+}
 /**
  *
  * @param guild Instance of Guild

@@ -7,3 +7,8 @@ export * from './adapters/Welcome/gif.js';
 export * from './adapters/BaseTaskLogger.js';
 export * from './adapters/Tasks/TaskLogger.js';
 export * from './adapters/Tasks/Birthdays.js';
+export * from './leveling.js';
+export * from './counting.js';
+export * from './economy.js';
+export * from './wallet.js';
+export * from './setup.js';

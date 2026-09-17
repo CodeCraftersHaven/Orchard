@@ -19,6 +19,7 @@ RUN npm install --include=dev
 RUN npm install -g serve @sern/cli
 
 RUN npm run database:generate
+RUN npm run database:db-push
 RUN npm run build
 
 # --- API Production Stage ---

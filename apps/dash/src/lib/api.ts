@@ -2,9 +2,12 @@ import type {
   Guild,
   GuildSettings,
   GuildSettingsResponse,
+  ReactionRoleResponse,
+  ReactionRolePanel,
   HealthResponse,
   Me,
   OrchardStats,
+  EconomyItemDefinition,
 } from "@orchard/types";
 
 export type {
@@ -89,6 +92,24 @@ export const saveGuildSettings = (guildId: string, settings: Partial<GuildSettin
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(settings),
   });
+export const disableGuildSystem = (guildId: string, system: string) =>
+  apiFetch<{ deleted: boolean }>(`/guilds/${guildId}/systems/${system}`, { method: "DELETE" });
+export const getReactionRoles = (guildId: string) => apiFetch<ReactionRoleResponse>(`/guilds/${guildId}/reaction-roles`);
+export const createReactionRolePanel = (guildId: string, panel: { channelId: string; title: string; description: string; entries: Array<{ roleId: string; emoji: string }> }) =>
+  apiFetch<{ panel: ReactionRolePanel }>(`/guilds/${guildId}/reaction-roles`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(panel),
+  });
+export const deleteReactionRolePanel = (guildId: string, panelId: string) =>
+  apiFetch<{ deleted: boolean }>(`/guilds/${guildId}/reaction-roles/${panelId}`, { method: "DELETE" });
+export const getEconomyItems = (guildId: string) => apiFetch<EconomyItemDefinition[]>(`/guilds/${guildId}/economy/items`);
+export const createEconomyItem = (guildId: string, item: { item: string; game: EconomyItemDefinition["game"]; value: number }) =>
+  apiFetch<EconomyItemDefinition>(`/guilds/${guildId}/economy/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) });
+export const updateEconomyItem = (guildId: string, itemId: string, item: { game?: EconomyItemDefinition["game"]; value?: number }) =>
+  apiFetch<EconomyItemDefinition>(`/guilds/${guildId}/economy/items/${itemId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) });
+export const deleteEconomyItem = (guildId: string, itemId: string) =>
+  apiFetch<{ deleted: boolean }>(`/guilds/${guildId}/economy/items/${itemId}`, { method: "DELETE" });
 export const getOrchardStats = () => apiFetch<OrchardStats>("/stats");
 export const getHealth = () => apiFetch<HealthResponse>("/health");
 export const discordLoginUrl = () => `${API_BASE_URL}/auth/discord/login`;

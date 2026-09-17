@@ -1,6 +1,7 @@
 import { bdayAnnouncement, today } from '#utils';
 import { commandModule, CommandType } from '@sern/handler';
 import { ApplicationCommandOptionType, GuildMember, PermissionFlagsBits } from 'discord.js';
+import { publishConfig, IntegrationContextType } from '#plugins';
 
 const isAdministrator = (ctx: any) =>
   (ctx.member as unknown as GuildMember).permissions.has(PermissionFlagsBits.Administrator);
@@ -8,7 +9,16 @@ const isAdministrator = (ctx: any) =>
 export default commandModule({
   type: CommandType.Slash,
   description: 'Manage birthdays in my memory.',
-  plugins: [],
+  plugins: [
+    publishConfig({
+      contexts: [
+        IntegrationContextType.GUILD
+      ],
+      integrationTypes: [
+        'Guild'
+      ]
+    })
+  ],
   options: [
     {
       type: ApplicationCommandOptionType.Subcommand,
@@ -52,8 +62,21 @@ export default commandModule({
       description: 'Delete a global birthday.',
       options: [{ type: ApplicationCommandOptionType.User, name: 'user-to-delete', description: 'Select a user.', required: false }]
     },
-    { type: ApplicationCommandOptionType.Subcommand, name: 'enable', description: 'Receive birthday announcements in this server.' },
-    { type: ApplicationCommandOptionType.Subcommand, name: 'disable', description: 'Stop receiving birthday announcements in this server.' },
+    {
+      type: ApplicationCommandOptionType.Subcommand,
+      name: 'announcements',
+      description: 'Enable or disable birthday announcements in this server.',
+      options: [{
+        type: ApplicationCommandOptionType.String,
+        name: 'action',
+        description: 'Choose whether to receive birthday announcements.',
+        required: true,
+        choices: [
+          { name: 'Enable', value: 'enable' },
+          { name: 'Disable', value: 'disable' }
+        ]
+      }]
+    },
     {
       name: 'get',
       type: ApplicationCommandOptionType.Subcommand,
@@ -75,8 +98,9 @@ export default commandModule({
     const targetId = ctx.options.getString('user-to-edit') ?? requestedUser.id;
     const pronoun = (userId: string) => userId === ctx.user.id ? 'your' : `<@${userId}>'s`;
 
-    if (sub === 'enable' || sub === 'disable') {
-      if (sub === 'enable') {
+    if (sub === 'announcements') {
+      const action = ctx.options.getString('action', true);
+      if (action === 'enable') {
         const entry = await deps.prisma.birthdayEntry.findUnique({ where: { userID: ctx.user.id } });
         if (!entry) return ctx.reply({ flags: 64, content: 'Set your global birthday first with `/birthday set`.' });
         await deps.prisma.birthdaySubscription.upsert({
@@ -87,7 +111,7 @@ export default commandModule({
       } else {
         await deps.prisma.birthdaySubscription.deleteMany({ where: { userID: ctx.user.id, gID: ctx.guildId } });
       }
-      return ctx.reply({ flags: 64, content: sub === 'enable' ? 'You will receive birthday announcements in this server.' : 'You will no longer receive birthday announcements in this server.' });
+      return ctx.reply({ flags: 64, content: action === 'enable' ? 'You will receive birthday announcements in this server.' : 'You will no longer receive birthday announcements in this server.' });
     }
 
     if (sub === 'get') {

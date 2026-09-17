@@ -6,15 +6,156 @@ generator client {
     provider = "prisma-client-js"
 }
 
+//Reaction Roles
+model ReactionRole {
+    id          String              @id
+    gID         String
+    messageId   String
+    channelId   String
+    title       String
+    description String
+    roles       ReactionRoleEntry[] @relation("ReactionRoleEntries")
+}
+
+model ReactionRoleEntry {
+    id             String       @id
+    reactionRoleId String
+    reactionRole   ReactionRole @relation("ReactionRoleEntries", fields: [reactionRoleId], references: [id], onDelete: Cascade)
+    roleId         String
+    emoji          String
+}
+
+model SystemSetupPanel {
+    id        String @id
+    gID       String
+    system    String
+    channelId String
+    messageId String
+    note      String @default("")
+
+    @@unique([gID, system])
+}
+
 // Economy
-model Money {
-    id       Int     @id @default(dbgenerated("(floor(random() * (2147483647 - 1 + 1)) + 1)::int"))
+model MoneyUser {
+    id       String        @id
     username String
     nickname String?
-    userID   String  @unique
-    serverID String
-    bank     Int     @default(0)
-    wallet   Int     @default(0)
+    bank     Int           @default(0)
+    wallets  MoneyWallet[]
+}
+
+model MoneyWallet {
+    userId   String
+    serverId String
+    wallet   Int    @default(0)
+
+    user MoneyUser @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@id([userId, serverId])
+}
+
+model EconomySettings {
+    gID              String @id
+    currencyName     String @default("Coins")
+    bankName         String @default("Bank")
+    currencyImageUrl String @default("")
+    bankImageUrl     String @default("")
+}
+
+model EconomyItem {
+    id       String @id
+    userId   String
+    serverId String
+    item     String
+    quantity Int    @default(0)
+
+    @@unique([userId, serverId, item])
+}
+
+model EconomyItemDefinition {
+    id       String @id
+    serverId String
+    item     String
+    game     String
+    value    Int
+
+    @@unique([serverId, item])
+    @@index([serverId, game])
+}
+
+model EconomyFarmPlot {
+    id        String   @id
+    userId    String
+    serverId  String
+    seed      String
+    crop      String
+    plantedAt DateTime @default(now())
+    readyAt   DateTime
+    notificationChannelId String @default("")
+    notificationMessageId String @default("")
+    completionNotifiedAt DateTime?
+
+    @@unique([userId, serverId])
+}
+
+model EconomyCraftJob {
+    id        String   @id
+    userId    String
+    serverId  String
+    recipe    String
+    output    String
+    quantity  Int      @default(1)
+    startedAt DateTime @default(now())
+    readyAt   DateTime
+    notificationChannelId String @default("")
+    notificationMessageId String @default("")
+    completionNotifiedAt DateTime?
+
+    @@unique([userId, serverId])
+}
+
+model EconomyBoost {
+    id         String   @id
+    userId     String
+    serverId   String
+    recipe     String
+    multiplier Float
+    expiresAt  DateTime
+
+    @@unique([userId, serverId])
+}
+
+model EconomyListing {
+    id        String   @id
+    sellerId  String
+    serverId  String
+    item      String
+    quantity  Int
+    priceEach Int
+    createdAt DateTime @default(now())
+
+    @@index([serverId, item])
+}
+
+model EconomyGameSession {
+    id           String                   @id
+    serverId     String
+    game         String
+    leaderId     String
+    invitesOpen  Boolean                  @default(false)
+    status       String                   @default("active")
+    startedAt    DateTime                 @default(now())
+    readyAt      DateTime
+    participants EconomyGameParticipant[]
+}
+
+model EconomyGameParticipant {
+    sessionId String
+    userId    String
+    session   EconomyGameSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@id([sessionId, userId])
 }
 
 model Member {
@@ -24,15 +165,19 @@ model Member {
 }
 
 model Guild {
-    gID                    String @id @unique
+    gID                    String  @id @unique
     gName                  String
-    announcementsChannelId String @default("")
-    rolesChannelId         String @default("")
-    modC                   String @default("")
-    gamingChannelId        String @default("")
-    taskLogsChannelId      String @default("")
-    verifiedRole           String @default("")
-    reactionMessageId      String @default("")
+    announcementsChannelId String  @default("")
+    rolesChannelId         String  @default("")
+    modC                   String  @default("")
+    gamingChannelId        String  @default("")
+    taskLogsChannelId      String  @default("")
+    nonVerifiedRoleId      String  @default("")
+    verifiedRole           String  @default("")
+    reactionMessageId      String  @default("")
+    leaveEnabled           Boolean @default(false)
+    leaveChannelId         String  @default("")
+    introC                 String  @default("")
 }
 
 model ServerStats {
@@ -44,6 +189,7 @@ model ServerStats {
     userCountChan String @default("")
     botCountChan  String @default("")
     allCountChan  String @default("")
+    categoryId    String @default("")
 }
 
 // Birthday System
@@ -91,6 +237,7 @@ model Counter {
     lastUser     String?
     lastCount    Int?
     highestCount Int
+    recordPending Boolean      @default(false)
     users        CountingUser[]
 }
 
@@ -103,15 +250,22 @@ model CountingUser {
 
 // Welcome System
 model WelcomeSettings {
-    gID                 String  @id @unique
-    enabled             Boolean @default(false)
-    channelId           String  @default("")
-    backgroundUrl       String  @default("")
-    avatarPosition      String  @default("middle")
-    leaveEnabled        Boolean @default(false)
-    leaveChannelId      String  @default("")
-    leaveBackgroundUrl  String  @default("")
-    leaveAvatarPosition String  @default("middle")
+    gID            String  @id @unique
+    enabled        Boolean @default(false)
+    channelId      String  @default("")
+    backgroundUrl  String  @default("")
+    avatarPosition String  @default("middle")
+    mode           String  @default("image")
+    embedTitle     String  @default("")
+    embedDescription String @default("")
+    embedColor     String  @default("#5865F2")
+    embedAuthor    String  @default("")
+    embedTimestamp Boolean @default(false)
+    embedFields    String  @default("[]")
+    containerExtraText String @default("")
+    containerImageUrl String @default("")
+    containerGalleryUrls String @default("")
+    containerSeparators Boolean @default(true)
 }
 
 model CustomWelcomeMessages {
@@ -130,6 +284,39 @@ model BotWelcomeMessages {
 //Task System
 model TaskMessages {
     messageId String @id @unique
+}
+
+// Leveling System
+model LevelSettings {
+    gID             String  @id @unique
+    enabled         Boolean @default(false)
+    firstReward     Int     @default(1200)
+    secondReward    Int     @default(900)
+    thirdReward     Int     @default(700)
+    participantReward Int   @default(100)
+    weeklyKey       String  @default("")
+}
+
+model LevelUser {
+    userId   String
+    serverId String
+    xp       Int    @default(0)
+    weeklyXp Int    @default(0)
+
+    @@id([userId, serverId])
+    @@index([serverId, xp])
+}
+
+model LevelWeeklyReward {
+    id       String   @id
+    serverId String
+    weekKey  String
+    userId   String
+    place    Int
+    amount   Int
+    createdAt DateTime @default(now())
+
+    @@unique([serverId, weekKey, userId])
 }
 
 model User {

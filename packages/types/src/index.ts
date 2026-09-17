@@ -39,6 +39,7 @@ export interface DiscordChannel {
     name: string;
     type: number;
     parent_id: string | null;
+    position?: number;
 }
 
 export interface TokenResponse {
@@ -71,10 +72,51 @@ export interface GuildChannel {
     name: string;
     type: number;
     parent_id: string | null;
+    position?: number;
     categoryName?: string;
 }
 
+export interface GuildRole {
+    id: string;
+    name: string;
+    color: number;
+    position: number;
+    managed: boolean;
+}
+
+export interface ReactionRoleEntry {
+    id: string;
+    roleId: string;
+    emoji: string;
+    roleName?: string;
+}
+
+export interface ReactionRolePanel {
+    id: string;
+    gID: string;
+    messageId: string;
+    channelId: string;
+    title: string;
+    description: string;
+    entries: ReactionRoleEntry[];
+}
+
+export interface ReactionRoleResponse {
+    panels: ReactionRolePanel[];
+    channels: GuildChannel[];
+    roles: GuildRole[];
+}
+
+export interface EconomyItemDefinition {
+    id: string;
+    serverId: string;
+    item: string;
+    game: "scavenger-hunt" | "fishing" | "farming";
+    value: number;
+}
+
 export type AvatarPosition = "left" | "middle" | "right";
+export type WelcomeMode = "text" | "embed" | "image" | "container";
 
 export interface GuildSettings {
     gID: string;
@@ -90,19 +132,51 @@ export interface GuildSettings {
     gamingChannelId: string;
     taskLogsChannelId: string;
     verifiedRole: string;
+    nonVerifiedRoleId: string;
     reactionMessageID: string;
     welcomeC: string;
     welcomeAvatarPosition: AvatarPosition;
     welcomeBackgroundUrl: string;
+    welcomeMode: WelcomeMode;
+    welcomeEmbedTitle: string;
+    welcomeEmbedDescription: string;
+    welcomeEmbedColor: string;
+    welcomeEmbedAuthor: string;
+    welcomeEmbedTimestamp: boolean;
+    welcomeEmbedFields: string;
+    welcomeContainerExtraText: string;
+    welcomeContainerImageUrl: string;
+    welcomeContainerGalleryUrls: string;
+    welcomeContainerSeparators: boolean;
     botWelcomeMessage: string;
     botWelcomeMultiple: boolean;
+    economyCurrencyName: string;
+    economyBankName: string;
+    economyCurrencyImageUrl: string;
+    economyBankImageUrl: string;
     leaveC: string;
+    leaveEnabled: boolean;
     introC: string;
+    levelEnabled: boolean;
+    levelFirstReward: number;
+    levelSecondReward: number;
+    levelThirdReward: number;
+    levelParticipantReward: number;
+    statsAllChannel: string;
+    statsUsersChannel: string;
+    statsBotsChannel: string;
+    statsCategoryId: string;
+    statsCreateMissing?: boolean;
+    statsAllName?: string;
+    statsUsersName?: string;
+    statsBotsName?: string;
+    statsPlacement?: string;
 }
 
 export interface GuildSettingsResponse {
     guild: Partial<GuildSettings> & Pick<GuildSettings, "gID" | "gName">;
     channels: GuildChannel[];
+    roles: GuildRole[];
 }
 
 export interface OrchardStats {

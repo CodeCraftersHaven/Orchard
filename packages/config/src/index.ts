@@ -6,10 +6,7 @@ import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
 
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
-const mode = process.env.NODE_ENV ?? "development";
-const envPath = mode === "production"
-    ? resolve(projectRoot, ".env.production")
-    : resolve(projectRoot, ".env");
+const envPath = resolve(projectRoot, ".env");
 const fallbackPath = existsSync(envPath) ? envPath : resolve(projectRoot, ".env");
 
 export const env = load(CONFIG_KEYS, fallbackPath, true);

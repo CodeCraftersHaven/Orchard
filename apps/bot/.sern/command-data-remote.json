@@ -1,0 +1,755 @@
+{
+    "global": [
+        {
+            "id": "1548880350003077252",
+            "application_id": "1548710143724748810",
+            "version": "1549394767417188442",
+            "default_member_permissions": "8",
+            "type": 1,
+            "name": "setup",
+            "name_localizations": null,
+            "description": "Open Pomona's system setup panel.",
+            "description_localizations": null,
+            "dm_permission": false,
+            "contexts": [
+                0
+            ],
+            "integration_types": [
+                0
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1549576557021102093",
+            "application_id": "1548710143724748810",
+            "version": "1549919890423423047",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "level",
+            "name_localizations": null,
+            "description": "View your rank or the weekly XP leaderboard.",
+            "description_localizations": null,
+            "dm_permission": false,
+            "contexts": [
+                0
+            ],
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 1,
+                    "name": "rank",
+                    "name_localizations": null,
+                    "description": "View a canvas rank card.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 6,
+                            "name": "member",
+                            "name_localizations": null,
+                            "description": "Member to check.",
+                            "description_localizations": null
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "leaderboard",
+                    "name_localizations": null,
+                    "description": "View the server XP leaderboard.",
+                    "description_localizations": null
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1549509162952695909",
+            "application_id": "1548710143724748810",
+            "version": "1550202095527788556",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "game",
+            "name_localizations": null,
+            "description": "Play games and earn economy rewards.",
+            "description_localizations": null,
+            "dm_permission": false,
+            "contexts": [
+                0
+            ],
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 1,
+                    "name": "session-start",
+                    "name_localizations": null,
+                    "description": "Start a timed multiplayer game session.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "game",
+                            "name_localizations": null,
+                            "description": "Game to play.",
+                            "description_localizations": null,
+                            "required": true,
+                            "choices": [
+                                {
+                                    "name": "Heist",
+                                    "name_localizations": null,
+                                    "value": "heist"
+                                },
+                                {
+                                    "name": "Scavenger hunt",
+                                    "name_localizations": null,
+                                    "value": "scavenger-hunt"
+                                },
+                                {
+                                    "name": "Fishing",
+                                    "name_localizations": null,
+                                    "value": "fishing"
+                                },
+                                {
+                                    "name": "Farming",
+                                    "name_localizations": null,
+                                    "value": "farming"
+                                }
+                            ]
+                        },
+                        {
+                            "type": 5,
+                            "name": "open-invites",
+                            "name_localizations": null,
+                            "description": "Allow online server members to join.",
+                            "description_localizations": null
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "session-join",
+                    "name_localizations": null,
+                    "description": "Join an open or invited game session.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "session-id",
+                            "name_localizations": null,
+                            "description": "Session ID.",
+                            "description_localizations": null,
+                            "required": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "session-finish",
+                    "name_localizations": null,
+                    "description": "Collect rewards from a completed game session.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "session-id",
+                            "name_localizations": null,
+                            "description": "Session ID.",
+                            "description_localizations": null,
+                            "required": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "scavenger-hunt",
+                    "name_localizations": null,
+                    "description": "Search for a sellable item.",
+                    "description_localizations": null
+                },
+                {
+                    "type": 1,
+                    "name": "fishing",
+                    "name_localizations": null,
+                    "description": "Go fishing for a sellable item.",
+                    "description_localizations": null
+                },
+                {
+                    "type": 1,
+                    "name": "farm",
+                    "name_localizations": null,
+                    "description": "Start a crop and manage your farm from one message.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "item",
+                            "name_localizations": null,
+                            "description": "Seed to plant.",
+                            "description_localizations": null,
+                            "required": true,
+                            "choices": [
+                                {
+                                    "name": "Wheat seed",
+                                    "name_localizations": null,
+                                    "value": "Wheat Seed"
+                                },
+                                {
+                                    "name": "Carrot seed",
+                                    "name_localizations": null,
+                                    "value": "Carrot Seed"
+                                },
+                                {
+                                    "name": "Apple seed",
+                                    "name_localizations": null,
+                                    "value": "Apple Seed"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "sell",
+                    "name_localizations": null,
+                    "description": "Sell an item to the black market.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "item",
+                            "name_localizations": null,
+                            "description": "Item name.",
+                            "description_localizations": null,
+                            "required": true,
+                            "autocomplete": true
+                        },
+                        {
+                            "type": 4,
+                            "name": "quantity",
+                            "name_localizations": null,
+                            "description": "Number of items to sell.",
+                            "description_localizations": null,
+                            "min_value": 1
+                        }
+                    ]
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1549785443501871148",
+            "application_id": "1548710143724748810",
+            "version": "1549885619151306782",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "economy",
+            "name_localizations": null,
+            "description": "Manage your wallet, inventory, and player shop.",
+            "description_localizations": null,
+            "dm_permission": false,
+            "contexts": [
+                0
+            ],
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 1,
+                    "name": "wallet",
+                    "name_localizations": null,
+                    "description": "View your bank, wallet, inventory, and activity.",
+                    "description_localizations": null
+                },
+                {
+                    "type": 1,
+                    "name": "buy-seed",
+                    "name_localizations": null,
+                    "description": "Buy a seed for your farm.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "seed",
+                            "name_localizations": null,
+                            "description": "Seed to buy.",
+                            "description_localizations": null,
+                            "required": true,
+                            "choices": [
+                                {
+                                    "name": "Wheat seed · 20 coins",
+                                    "name_localizations": null,
+                                    "value": "Wheat Seed"
+                                },
+                                {
+                                    "name": "Carrot seed · 30 coins",
+                                    "name_localizations": null,
+                                    "value": "Carrot Seed"
+                                },
+                                {
+                                    "name": "Apple seed · 45 coins",
+                                    "name_localizations": null,
+                                    "value": "Apple Seed"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "shop-list",
+                    "name_localizations": null,
+                    "description": "List one of your items in the player shop.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "item",
+                            "name_localizations": null,
+                            "description": "Item name.",
+                            "description_localizations": null,
+                            "required": true,
+                            "autocomplete": true
+                        },
+                        {
+                            "type": 4,
+                            "name": "quantity",
+                            "name_localizations": null,
+                            "description": "Number of items to list.",
+                            "description_localizations": null,
+                            "required": true,
+                            "min_value": 1
+                        },
+                        {
+                            "type": 4,
+                            "name": "price-each",
+                            "name_localizations": null,
+                            "description": "Wallet coins per item.",
+                            "description_localizations": null,
+                            "required": true,
+                            "min_value": 1
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "shop-buy",
+                    "name_localizations": null,
+                    "description": "Buy an item from another player.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "listing-id",
+                            "name_localizations": null,
+                            "description": "Choose an item listing to buy.",
+                            "description_localizations": null,
+                            "required": true,
+                            "autocomplete": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "shop-cancel",
+                    "name_localizations": null,
+                    "description": "Cancel one of your player shop listings and reclaim the items.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "listing-id",
+                            "name_localizations": null,
+                            "description": "Listing to cancel.",
+                            "description_localizations": null,
+                            "required": true,
+                            "autocomplete": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "market-buy",
+                    "name_localizations": null,
+                    "description": "Buy an item directly from the black market.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "item",
+                            "name_localizations": null,
+                            "description": "Item to buy from the black market.",
+                            "description_localizations": null,
+                            "required": true,
+                            "autocomplete": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "shop",
+                    "name_localizations": null,
+                    "description": "Browse current player shop listings.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "item",
+                            "name_localizations": null,
+                            "description": "Filter by item name.",
+                            "description_localizations": null
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "item-add",
+                    "name_localizations": null,
+                    "description": "Admin: add an item to a game and set its black-market value.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "game",
+                            "name_localizations": null,
+                            "description": "Game pool.",
+                            "description_localizations": null,
+                            "required": true,
+                            "choices": [
+                                {
+                                    "name": "Scavenger hunt",
+                                    "name_localizations": null,
+                                    "value": "scavenger-hunt"
+                                },
+                                {
+                                    "name": "Fishing",
+                                    "name_localizations": null,
+                                    "value": "fishing"
+                                },
+                                {
+                                    "name": "Farming",
+                                    "name_localizations": null,
+                                    "value": "farming"
+                                }
+                            ]
+                        },
+                        {
+                            "type": 3,
+                            "name": "item",
+                            "name_localizations": null,
+                            "description": "Item name.",
+                            "description_localizations": null,
+                            "required": true
+                        },
+                        {
+                            "type": 4,
+                            "name": "value",
+                            "name_localizations": null,
+                            "description": "Black-market value.",
+                            "description_localizations": null,
+                            "required": true,
+                            "min_value": 1
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "item-edit",
+                    "name_localizations": null,
+                    "description": "Admin: edit an item black-market value.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "item",
+                            "name_localizations": null,
+                            "description": "Item name.",
+                            "description_localizations": null,
+                            "required": true
+                        },
+                        {
+                            "type": 4,
+                            "name": "value",
+                            "name_localizations": null,
+                            "description": "New black-market value.",
+                            "description_localizations": null,
+                            "required": true,
+                            "min_value": 1
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "item-remove",
+                    "name_localizations": null,
+                    "description": "Admin: remove an item from the game catalog.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "item",
+                            "name_localizations": null,
+                            "description": "Item name.",
+                            "description_localizations": null,
+                            "required": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "item-list",
+                    "name_localizations": null,
+                    "description": "Admin: list this server economy item catalog.",
+                    "description_localizations": null
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1549530822489407630",
+            "application_id": "1548710143724748810",
+            "version": "1549530822489407632",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "deposit",
+            "name_localizations": null,
+            "description": "Deposit wallet coins into your global bank.",
+            "description_localizations": null,
+            "dm_permission": true,
+            "contexts": null,
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 4,
+                    "name": "amount",
+                    "name_localizations": null,
+                    "description": "Amount to deposit.",
+                    "description_localizations": null,
+                    "required": true,
+                    "min_value": 1
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1549528151842099260",
+            "application_id": "1548710143724748810",
+            "version": "1549528151842099262",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "consume",
+            "name_localizations": null,
+            "description": "Consume a crafted meal for an economy boost.",
+            "description_localizations": null,
+            "dm_permission": true,
+            "contexts": null,
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 3,
+                    "name": "recipe",
+                    "name_localizations": null,
+                    "description": "Crafted meal to consume.",
+                    "description_localizations": null,
+                    "required": true,
+                    "choices": [
+                        {
+                            "name": "Bread · 15% boost · 30 minutes",
+                            "name_localizations": null,
+                            "value": "bread"
+                        },
+                        {
+                            "name": "Vegetable soup · 30% boost · 60 minutes",
+                            "name_localizations": null,
+                            "value": "soup"
+                        },
+                        {
+                            "name": "Apple pie · 50% boost · 90 minutes",
+                            "name_localizations": null,
+                            "value": "pie"
+                        }
+                    ]
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1548880350003077251",
+            "application_id": "1548710143724748810",
+            "version": "1549394767417188443",
+            "default_member_permissions": null,
+            "type": 1,
+            "name": "birthday",
+            "name_localizations": null,
+            "description": "Manage birthdays in my memory.",
+            "description_localizations": null,
+            "dm_permission": false,
+            "contexts": [
+                0
+            ],
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 1,
+                    "name": "set",
+                    "name_localizations": null,
+                    "description": "Set a global birthday and notify this server.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 6,
+                            "name": "user-to-add",
+                            "name_localizations": null,
+                            "description": "Select a user.",
+                            "description_localizations": null,
+                            "required": true
+                        },
+                        {
+                            "type": 3,
+                            "name": "date",
+                            "name_localizations": null,
+                            "description": "Birthday in (MM/DD) format.",
+                            "description_localizations": null,
+                            "required": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "edit",
+                    "name_localizations": null,
+                    "description": "Edit a global birthday.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "user-to-edit",
+                            "name_localizations": null,
+                            "description": "Select the user to edit.",
+                            "description_localizations": null,
+                            "required": true,
+                            "autocomplete": true
+                        },
+                        {
+                            "type": 3,
+                            "name": "edit-date",
+                            "name_localizations": null,
+                            "description": "Birthday in (MM/DD) format.",
+                            "description_localizations": null,
+                            "required": true
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "delete",
+                    "name_localizations": null,
+                    "description": "Delete a global birthday.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 6,
+                            "name": "user-to-delete",
+                            "name_localizations": null,
+                            "description": "Select a user.",
+                            "description_localizations": null
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "announcements",
+                    "name_localizations": null,
+                    "description": "Enable or disable birthday announcements in this server.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 3,
+                            "name": "action",
+                            "name_localizations": null,
+                            "description": "Choose whether to receive birthday announcements.",
+                            "description_localizations": null,
+                            "required": true,
+                            "choices": [
+                                {
+                                    "name": "Enable",
+                                    "name_localizations": null,
+                                    "value": "enable"
+                                },
+                                {
+                                    "name": "Disable",
+                                    "name_localizations": null,
+                                    "value": "disable"
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "type": 1,
+                    "name": "get",
+                    "name_localizations": null,
+                    "description": "Check a global birthday.",
+                    "description_localizations": null,
+                    "options": [
+                        {
+                            "type": 6,
+                            "name": "user-to-get",
+                            "name_localizations": null,
+                            "description": "Select a user.",
+                            "description_localizations": null
+                        }
+                    ]
+                }
+            ],
+            "nsfw": false
+        },
+        {
+            "id": "1550202095527788555",
+            "application_id": "1548710143724748810",
+            "version": "1550202095527788557",
+            "default_member_permissions": "8",
+            "type": 1,
+            "name": "announce",
+            "name_localizations": null,
+            "description": "Announce a message to the server",
+            "description_localizations": null,
+            "dm_permission": false,
+            "contexts": [
+                0
+            ],
+            "integration_types": [
+                0
+            ],
+            "options": [
+                {
+                    "type": 3,
+                    "name": "message",
+                    "name_localizations": null,
+                    "description": "The message to announce",
+                    "description_localizations": null,
+                    "required": true
+                },
+                {
+                    "type": 7,
+                    "name": "channel",
+                    "name_localizations": null,
+                    "description": "The channel to announce the message in",
+                    "description_localizations": null,
+                    "channel_types": [
+                        0
+                    ]
+                }
+            ],
+            "nsfw": false
+        }
+    ]
+}

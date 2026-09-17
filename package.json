@@ -5,25 +5,43 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently --names api,dash,bot --prefix name \"npm run dev --workspace=@orchard/api\" \"npm run dev --workspace=@orchard/dash\" \"npm run dev --workspace=@orchard/bot\"",
+
     "docker:prod": "docker compose --env-file .env.production up --build",
+
     "build": "npm run build --workspaces --if-present",
+
     "test": "npm run test --workspaces --if-present",
+
     "lint": "npm run lint --workspaces --if-present",
+
     "eslint": "eslint . --ext .ts,.tsx",
+
     "pretty": "prettier **/*.ts -w",
+
     "api:build": "npm exec -w @orchard/api -- tsc",
+
     "api:start": "npm exec -w @orchard/api -- node dist/index.js",
-    "bot:build": "npm exec -w @orchard/bot -- sern build",
+
+    "bot:build": "npm exec -w @orchard/bot -- npm run build",
+
     "bot:start": "npm exec -w @orchard/bot -- node .",
-    "bot:publish": "npm exec -w @orchard/bot -- sern commands publish",
+
     "database:build": "npm exec -w @orchard/database -- tsc",
+    
     "database:generate": "npm exec -w @orchard/database -- npx prisma generate",
+
     "database:db-push": "npm exec -w @orchard/database -- npx prisma db push",
+
     "dash:dev": "npm exec -w @orchard/dash -- vite --host 0.0.0.0",
+
     "dash:build": "npm exec -w @orchard/dash -- tsc && npm exec -w @orchard/dash -- vite build",
+
     "dash:preview": "npm exec -w @orchard/dash -- vite preview --host 0.0.0.0 --port 8990",
+
     "config:build": "npm exec -w @orchard/config -- tsc",
+
     "config:dev": "npm exec -w @orchard/config -- tsc --watch",
+    
     "types:build": "npm exec -w @orchard/types -- tsc"
   },
   "workspaces": [

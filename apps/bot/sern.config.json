@@ -2,6 +2,7 @@
   "language": "typescript",
   "paths": {
     "base": "src",
-    "commands": "commands"
+    "commands": "commands",
+    "defaultPrefix": "&"
   }
 }

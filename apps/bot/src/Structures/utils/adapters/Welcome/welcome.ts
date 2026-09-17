@@ -1,5 +1,5 @@
 import { createCanvas, loadImage, GlobalFonts } from '@napi-rs/canvas';
-import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, GuildMember, TextChannel } from 'discord.js';
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, ContainerBuilder, EmbedBuilder, GuildMember, MediaGalleryBuilder, MediaGalleryItemBuilder, MessageFlags, SeparatorBuilder, TextChannel, TextDisplayBuilder, type ColorResolvable } from 'discord.js';
 import { Service } from '@sern/handler';
 import { welcomeEmojis } from './gif.js';
 
@@ -153,7 +153,7 @@ export async function welcomeCreate(
 
   const guildSettings = await Service('prisma').welcomeSettings.findUnique({
     where: { gID: member.guild.id },
-    select: { avatarPosition: true, backgroundUrl: true }
+    select: { avatarPosition: true, backgroundUrl: true, mode: true, embedTitle: true, embedDescription: true, embedColor: true, embedAuthor: true, embedTimestamp: true, embedFields: true, containerExtraText: true, containerImageUrl: true, containerGalleryUrls: true, containerSeparators: true }
   });
   const resolvedAvatarPosition = avatarPosition ?? (
     guildSettings?.avatarPosition === 'left' || guildSettings?.avatarPosition === 'right'
@@ -226,8 +226,9 @@ export async function welcomeCreate(
     })
   ];
 
-  const content =
-    option([
+  const customWelcome = await Service('prisma').botWelcomeMessages.findUnique({ where: { gID: member.guild.id } });
+  const welcomeText =
+    option(customWelcome?.messagesArray?.length ? customWelcome.messagesArray : [
       `👋 Welcome to ${guildName}, ${member}`,
       `We hope you find what you're looking for and that you enjoy your stay, ${member}.`,
       `${member} is here to kick ass and chew gum, but ${member} has run out of gum.`,
@@ -240,15 +241,48 @@ export async function welcomeCreate(
       `${member} never gonna let you down, ${member} never gonna give you up.`,
       `Hi ${member}! Welcome to our community! Please make yourself at home!`,
       `Welcome, {member}! Hopefully you aren't a moose because they're one of the main prey for orca whales 🫎`
-    ]) +
-    `\n-# You may now go to <#${channels.intro}> to introduce yourself and <#${channels.roles}> to get some roles!`;
+    ])
+      .replaceAll('{guild}', guildName)
+      .replaceAll('{member}', member.toString());
+  const footer = `\n-# You may now go to <#${channels.intro}> to introduce yourself and <#${channels.roles}> to get some roles!`;
+  const content = welcomeText + footer;
+  const mode = guildSettings?.mode === 'text' || guildSettings?.mode === 'embed' || guildSettings?.mode === 'container' ? guildSettings.mode : 'image';
 
   try {
-    await WelcomeChannel.send({
-      content,
-      files: Attachment,
-      components: button
-    });
+    if (mode === 'text') return void await WelcomeChannel.send({ content, components: button });
+    if (mode === 'container') {
+      const container = new ContainerBuilder();
+      if (guildSettings?.containerSeparators) container.addSeparatorComponents(new SeparatorBuilder());
+      container.addTextDisplayComponents(new TextDisplayBuilder().setContent(content));
+      if (guildSettings?.containerExtraText) {
+        if (guildSettings.containerSeparators) container.addSeparatorComponents(new SeparatorBuilder());
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(guildSettings.containerExtraText));
+      }
+      const galleryUrls = (guildSettings?.containerGalleryUrls || '').split(/\r?\n|,/).map(url => url.trim()).filter(Boolean);
+      if (guildSettings?.containerImageUrl || galleryUrls.length) {
+        const urls = guildSettings?.containerImageUrl ? [guildSettings.containerImageUrl, ...galleryUrls] : galleryUrls;
+        container.addMediaGalleryComponents(new MediaGalleryBuilder().addItems(...urls.map(url => new MediaGalleryItemBuilder().setURL(url))));
+      }
+      container.addActionRowComponents(button[0]);
+      return void await WelcomeChannel.send({ components: [container], flags: MessageFlags.IsComponentsV2 });
+    }
+    if (mode === 'embed') {
+      const embedColor = guildSettings?.embedColor && /^#[0-9A-Fa-f]{6}$/.test(guildSettings.embedColor)
+        ? guildSettings.embedColor as ColorResolvable
+        : '#5865F2' as ColorResolvable;
+      const embed = new EmbedBuilder()
+        .setTitle(guildSettings?.embedTitle || 'Welcome!')
+        .setDescription((guildSettings?.embedDescription || welcomeText) + footer)
+        .setColor(embedColor);
+      if (guildSettings?.embedAuthor) embed.setAuthor({ name: guildSettings.embedAuthor });
+      if (guildSettings?.embedTimestamp) embed.setTimestamp();
+      try {
+        const fields = JSON.parse(guildSettings?.embedFields || '[]');
+        if (Array.isArray(fields)) embed.addFields(fields.filter(field => field?.name && field?.value).map(field => ({ name: String(field.name), value: String(field.value), inline: Boolean(field.inline) })));
+      } catch { /* Ignore malformed optional fields. */ }
+      return void await WelcomeChannel.send({ embeds: [embed], components: button });
+    }
+    await WelcomeChannel.send({ content, files: Attachment, components: button });
   } catch (error) {
     console.log(error);
   }

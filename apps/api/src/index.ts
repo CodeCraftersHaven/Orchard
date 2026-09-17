@@ -18,6 +18,7 @@ const fastify = Fastify({
 await fastify.register(cors, {
   origin: DASH_BASE_URL,
   credentials: true,
+  methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"],
 });
 
 fastify.decorate("prisma", prisma);

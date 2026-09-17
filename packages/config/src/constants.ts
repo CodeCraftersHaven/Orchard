@@ -11,6 +11,7 @@ export const CONFIG_KEYS = [
     'API_PORT',
     'DASH_PORT',
     'OWNER_IDS',
+    'DEFAULT_PREFIX',
 ] as const;
 
 export type ConfigKey = (typeof CONFIG_KEYS)[number];

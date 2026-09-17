@@ -1,22 +1,31 @@
-import { useEffect, useState } from "react";
-import type { GuildChannel, GuildSettings } from "@orchard/types";
+import { useEffect, useState, type ReactNode } from "react";
+import type { EconomyItemDefinition, GuildChannel, GuildRole, GuildSettings, ReactionRolePanel, WelcomeMode } from "@orchard/types";
 import { Link, useParams } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { Spinner } from "../components/Spinner";
+import { GuildNavigationMenu } from "../components/GuildNavigationMenu";
 import { useAuth } from "../context/AuthContext";
 import { Unauthorized } from "./Unauthorized";
 import {
     ApiError,
     avatarUrl,
     getGuildSettings,
+    getReactionRoles,
+    createReactionRolePanel,
+    deleteReactionRolePanel,
     saveGuildSettings,
+    disableGuildSystem,
+    getEconomyItems,
+    createEconomyItem,
+    updateEconomyItem,
+    deleteEconomyItem,
 } from "../lib/api";
 
 const defaultWelcomeBackgroundUrl = "https://i.imgur.com/RCiKhGl.png";
 
 const channelFields: Array<{ key: keyof GuildSettings; label: string; description: string }> = [
     { key: "welcomeC", label: "Welcome messages", description: "Where new member welcome messages are sent." },
-    { key: "leaveC", label: "Leave messages", description: "Where member departure messages are sent." },
+    { key: "leaveC", label: "Leave messages", description: "Where member departure messages are sent. Set to Not configured to disable." },
     { key: "introC", label: "Introductions", description: "Channel referenced by welcome messages." },
     { key: "rolesChannelId", label: "Roles", description: "Channel for role selection and role updates." },
     { key: "announcementsChannelId", label: "Announcements", description: "Primary community announcements channel." },
@@ -42,12 +51,32 @@ const systemGroups = {
     community: {
         label: "Community channels",
         description: "Connect Orchard to the channels used by community features.",
-        fields: ["introC", "rolesChannelId", "announcementsChannelId", "taskLogsChannelId", "gamingChannelId", "modC"] as Array<keyof GuildSettings>,
+        fields: ["introC", "announcementsChannelId", "taskLogsChannelId", "gamingChannelId", "modC", "leaveC"] as Array<keyof GuildSettings>,
     },
     counting: {
         label: "Counting",
         description: "Choose the channel and activation state for the counting game.",
         fields: ["countingChannel"] as Array<keyof GuildSettings>,
+    },
+    serverStats: {
+        label: "Server stats",
+        description: "Configure visible voice-channel counters for all members, users, and bots.",
+        fields: [] as Array<keyof GuildSettings>,
+    },
+    leveling: {
+        label: "Leveling",
+        description: "Award XP for chatting and let members climb the server leaderboard.",
+        fields: [] as Array<keyof GuildSettings>,
+    },
+    economy: {
+        label: "Economy",
+        description: "Customize the currency and bank shown by Orchard.",
+        fields: [] as Array<keyof GuildSettings>,
+    },
+    reactionRoles: {
+        label: "Reaction roles",
+        description: "Create Discord embed menus that grant roles when members react.",
+        fields: [] as Array<keyof GuildSettings>,
     },
 } as const;
 
@@ -79,6 +108,57 @@ function channelOptions(channels: GuildChannel[]) {
     );
 }
 
+function placementGaps(channels: GuildChannel[], excludedCategoryId: string, selected: string, onSelect: (placement: string) => void) {
+    const topLevel = channels.filter((channel) => channel.parent_id === null && channel.id !== excludedCategoryId);
+    const ordered = [
+        ...topLevel.filter((channel) => channel.type !== 4),
+        ...topLevel.filter((channel) => channel.type === 4),
+    ].sort((left, right) => {
+        const leftGroup = left.type === 4 ? 1 : 0;
+        const rightGroup = right.type === 4 ? 1 : 0;
+        return leftGroup - rightGroup || (left.position ?? 0) - (right.position ?? 0);
+    });
+    return ordered.flatMap((channel, index) => {
+        const next = ordered[index + 1];
+        const items: ReactNode[] = [
+            <div key={`channel-${channel.id}`} className="flex items-center gap-2 py-1 text-sm text-slate-300">
+                <span className="text-slate-500">{channel.type === 4 ? "▾" : "#"}</span>
+                <span>{channel.type === 4 ? channel.name : channel.name}</span>
+            </div>,
+        ];
+        if (next) {
+            const placement = `before:${next.id}`;
+            items.push(
+                <button
+                    key={`gap-${next.id}`}
+                    type="button"
+                    title={`Place server stats before ${next.type === 4 ? next.name : `#${next.name}`}`}
+                    aria-label={`Place server stats before ${next.type === 4 ? next.name : next.name}`}
+                    onClick={() => onSelect(placement)}
+                    className={`my-1 h-3 w-full border-0 border-t-2 transition ${selected === placement ? "border-discord-green" : "border-white/10 hover:border-discord-green/70"}`}
+                />,
+            );
+        }
+        return items;
+    });
+}
+
+function embedFieldsText(value: string) {
+    try {
+        const fields = JSON.parse(value || "[]") as Array<{ name?: string; value?: string; inline?: boolean }>;
+        return fields.map((field) => `${field.name ?? ""} | ${field.value ?? ""}${field.inline ? " | inline" : ""}`).join("\n");
+    } catch {
+        return "";
+    }
+}
+
+function embedFieldsJson(value: string) {
+    return JSON.stringify(value.split("\n").map((line) => line.trim()).filter(Boolean).map((line) => {
+        const [name, fieldValue, inline] = line.split("|").map((part) => part.trim());
+        return { name, value: fieldValue, inline: inline?.toLowerCase() === "inline" };
+    }).filter((field) => field.name && field.value));
+}
+
 export function GuildManagement() {
     const { guildId, system } = useParams();
     const { user } = useAuth();
@@ -88,19 +168,44 @@ export function GuildManagement() {
     const [settings, setSettings] = useState<Partial<GuildSettings>>({});
     const [botWelcomeMessages, setBotWelcomeMessages] = useState<string[]>([""]);
     const [error, setError] = useState<string | null>(null);
+    const [reactionError, setReactionError] = useState<string | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [unauthorized, setUnauthorized] = useState(false);
     const [backgroundImageFailed, setBackgroundImageFailed] = useState(false);
+    const [reactionPanels, setReactionPanels] = useState<ReactionRolePanel[]>([]);
+    const [reactionChannels, setReactionChannels] = useState<GuildChannel[]>([]);
+    const [reactionRoles, setReactionRoles] = useState<GuildRole[]>([]);
+    const [reactionTitle, setReactionTitle] = useState("Choose your roles");
+    const [reactionDescription, setReactionDescription] = useState("React below to add or remove a role.");
+    const [reactionChannelId, setReactionChannelId] = useState("");
+    const [reactionEntries, setReactionEntries] = useState<Array<{ roleId: string; emoji: string }>>([{ roleId: "", emoji: "🎮" }]);
+    const [reactionSaving, setReactionSaving] = useState(false);
+    const [economyCurrencyName, setEconomyCurrencyName] = useState("Coins");
+    const [economyBankName, setEconomyBankName] = useState("Bank");
+    const [economyCurrencyImageUrl, setEconomyCurrencyImageUrl] = useState("");
+    const [economyBankImageUrl, setEconomyBankImageUrl] = useState("");
+    const [economyItems, setEconomyItems] = useState<EconomyItemDefinition[]>([]);
+    const [newEconomyItem, setNewEconomyItem] = useState({ item: "", game: "scavenger-hunt" as EconomyItemDefinition["game"], value: 10 });
+    const [statsAllName, setStatsAllName] = useState("Total Members");
+    const [statsUsersName, setStatsUsersName] = useState("Users");
+    const [statsBotsName, setStatsBotsName] = useState("Bots");
+    const [statsCreateMissing, setStatsCreateMissing] = useState(false);
+    const [statsPlacement, setStatsPlacement] = useState("");
 
     useEffect(() => {
         if (!guildId) return;
+
         getGuildSettings(guildId)
             .then((response) => {
                 setGuildName(response.guild.gName);
                 setChannels(response.channels);
                 setSettings(response.guild);
+                setEconomyCurrencyName(response.guild.economyCurrencyName ?? "Coins");
+                setEconomyBankName(response.guild.economyBankName ?? "Bank");
+                setEconomyCurrencyImageUrl(response.guild.economyCurrencyImageUrl ?? "");
+                setEconomyBankImageUrl(response.guild.economyBankImageUrl ?? "");
                 const storedMessages = String(response.guild.botWelcomeMessage ?? "")
                     .split(";")
                     .map((message) => message.trim())
@@ -115,7 +220,36 @@ export function GuildManagement() {
                 setError(err instanceof ApiError ? err.message : "Failed to load guild settings.");
             })
             .finally(() => setLoading(false));
+
     }, [guildId]);
+
+    useEffect(() => {
+        if (!guildId || activeSystem !== "economy") return;
+        getEconomyItems(guildId).then(setEconomyItems).catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load economy items."));
+    }, [guildId, activeSystem]);
+
+    useEffect(() => {
+        if (!guildId || activeSystem !== "reactionRoles") {
+            setReactionError(null);
+            return;
+        }
+
+        getReactionRoles(guildId)
+            .then((reactionResponse) => {
+                setReactionPanels(reactionResponse.panels);
+                setReactionChannels(reactionResponse.channels);
+                setReactionRoles(reactionResponse.roles);
+                setReactionChannelId(reactionResponse.channels[0]?.id ?? "");
+                setReactionError(null);
+            })
+            .catch((err) => {
+                setReactionPanels([]);
+                setReactionChannels([]);
+                setReactionRoles([]);
+                setReactionChannelId("");
+                setReactionError(err instanceof ApiError ? err.message : "Failed to load reaction roles.");
+            });
+    }, [guildId, activeSystem]);
 
     const welcomeBackgroundUrl = settings.welcomeBackgroundUrl?.trim() || defaultWelcomeBackgroundUrl;
     const previewBackgroundUrl = backgroundImageFailed ? defaultWelcomeBackgroundUrl : welcomeBackgroundUrl;
@@ -135,7 +269,7 @@ export function GuildManagement() {
 
     if (unauthorized) return <Unauthorized />;
 
-    const updateSetting = (key: keyof GuildSettings, value: string | boolean) => {
+    const updateSetting = (key: keyof GuildSettings, value: string | boolean | number) => {
         setSettings((current) => ({ ...current, [key]: value }));
         setNotice(null);
     };
@@ -149,10 +283,36 @@ export function GuildManagement() {
             await saveGuildSettings(guildId, {
                 ...settings,
                 botWelcomeMessage: botWelcomeMessages.join("; "),
+                economyCurrencyName,
+                economyBankName,
+                economyCurrencyImageUrl,
+                economyBankImageUrl,
+                statsCreateMissing,
+                statsAllName,
+                statsUsersName,
+                statsBotsName,
+                statsPlacement,
             });
             setNotice("Guild settings saved.");
         } catch (err) {
             setError(err instanceof ApiError ? err.message : "Failed to save guild settings.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const disableSystem = async () => {
+        if (!guildId || !activeSystem) return;
+        if (!window.confirm(`Disable ${systemGroups[activeSystem].label}? This removes its stored configuration.`)) return;
+        setSaving(true);
+        setError(null);
+        setNotice(null);
+        try {
+            await disableGuildSystem(guildId, activeSystem);
+            setNotice(`${systemGroups[activeSystem].label} disabled and removed.`);
+            window.location.reload();
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to disable system.");
         } finally {
             setSaving(false);
         }
@@ -176,28 +336,59 @@ export function GuildManagement() {
         }
     };
 
+    const saveReactionPanel = async () => {
+        if (!guildId || !reactionChannelId || reactionEntries.some((entry) => !entry.roleId || !entry.emoji.trim())) return;
+        setReactionSaving(true);
+        try {
+            const created = await createReactionRolePanel(guildId, { channelId: reactionChannelId, title: reactionTitle, description: reactionDescription, entries: reactionEntries });
+            setReactionPanels((current) => [...current, created.panel]);
+            setNotice("Reaction role embed created.");
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to create reaction role embed.");
+        } finally {
+            setReactionSaving(false);
+        }
+    };
+
+    const removeReactionPanel = async (panelId: string) => {
+        if (!guildId) return;
+        try {
+            await deleteReactionRolePanel(guildId, panelId);
+            setReactionPanels((current) => current.filter((panel) => panel.id !== panelId));
+            setNotice("Reaction role embed deleted.");
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to delete reaction role embed.");
+        }
+    };
+
     return (
         <div className="min-h-screen bg-[radial-gradient(circle_at_top,_#1a1d29,_#0b0d12)]">
             <Navbar />
             <main className="mx-auto max-w-6xl px-6 py-10">
-                <Link to="/dashboard" className="text-sm text-slate-400 transition hover:text-white">← Back to servers</Link>
+                {guildId && <GuildNavigationMenu guildId={guildId} showSystemsLink={Boolean(activeSystem)} />}
 
                 {loading && <div className="flex items-center gap-3 py-20 text-slate-400"><Spinner /> Loading guild settings…</div>}
                 {error && <div className="mt-8 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</div>}
+                {reactionError && !loading && (
+                    <div className="mt-4 rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-200">
+                        {reactionError}
+                    </div>
+                )}
 
                 {!loading && !error && (
                     <>
                         <header className="mt-8 flex flex-col justify-between gap-5 border-b border-white/10 pb-8 sm:flex-row sm:items-end">
                             <div>
-                                <Link to={`/dashboard/guilds/${guildId}`} className="text-xs font-semibold uppercase tracking-[0.25em] text-discord-green hover:text-white">
-                                    {activeSystem ? "Back to systems" : "Guild control"}
-                                </Link>
+                                {!activeSystem && <span className="text-xs font-semibold uppercase tracking-[0.25em] text-discord-green">Guild control</span>}
                                 <h1 className="mt-3 text-3xl font-semibold text-white">{activeSystem ? systemGroups[activeSystem].label : guildName}</h1>
                                 <p className="mt-2 text-slate-400">{activeSystem ? systemGroups[activeSystem].description : "Configure Orchard systems and the channels they use."}</p>
                             </div>
-                            <button type="button" onClick={() => void save()} disabled={saving} className="rounded-lg bg-discord-green px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-discord-green/90 disabled:cursor-wait disabled:opacity-60">
-                                {saving ? "Saving…" : "Save changes"}
-                            </button>
+                            <div className="flex flex-wrap justify-end gap-3">
+                                {activeSystem && <button type="button" onClick={() => void disableSystem()} disabled={saving} className="rounded-lg border border-red-400/40 px-5 py-2.5 text-sm font-semibold text-red-300 transition hover:border-red-300 hover:text-red-200 disabled:cursor-wait disabled:opacity-60">Disable system</button>}
+                                <button type="button" onClick={() => void save()} disabled={saving} className="rounded-lg bg-discord-green px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-discord-green/90 disabled:cursor-wait disabled:opacity-60">
+                                    {saving ? "Saving…" : "Save changes"}
+                                </button>
+                            </div>
                         </header>
 
                         {notice && <div className="mt-6 rounded-xl border border-emerald-400/20 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">{notice}</div>}
@@ -213,7 +404,7 @@ export function GuildManagement() {
                             ))}
                         </section>}
 
-                        {activeSystem && <section className="mt-8 grid gap-5 md:grid-cols-2">
+                        {activeSystem && activeSystem !== "reactionRoles" && <section className="mt-8 grid gap-5 md:grid-cols-2">
                             {channelFields.filter((field) => systemGroups[activeSystem].fields.includes(field.key)).map((field) => (
                                 <label key={field.key} className="rounded-2xl border border-white/10 bg-white/5 p-5">
                                     <span className="block font-semibold text-white">{field.label}</span>
@@ -223,7 +414,7 @@ export function GuildManagement() {
                                         onChange={(event) => updateSetting(field.key, event.target.value)}
                                         className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white outline-none transition focus:border-discord-blurple"
                                     >
-                                        {channelOptions(channels)}
+                                        {channelOptions(channels.filter((channel) => channel.type === 0))}
                                     </select>
                                 </label>
                             ))}
@@ -240,6 +431,60 @@ export function GuildManagement() {
                                     <option value="right">Right</option>
                                 </select>
                             </label>}
+                        </section>}
+
+                        {activeSystem === "reactionRoles" && <section className="mt-8 grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.8fr)]">
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">New reaction role embed</h2>
+                                <p className="mt-1 text-sm text-slate-400">Create one Discord message with multiple emoji-to-role mappings.</p>
+                                <select value={reactionChannelId} onChange={(event) => setReactionChannelId(event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                    <option value="">Choose a channel</option>
+                                    {reactionChannels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+                                </select>
+                                <input value={reactionTitle} onChange={(event) => setReactionTitle(event.target.value)} placeholder="Embed title" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <textarea value={reactionDescription} onChange={(event) => setReactionDescription(event.target.value)} placeholder="Embed description" rows={3} className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <div className="mt-4 space-y-3">
+                                    {reactionEntries.map((entry, index) => <div key={index} className="grid grid-cols-[72px_1fr] gap-2">
+                                        <input value={entry.emoji} onChange={(event) => setReactionEntries((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, emoji: event.target.value } : item))} placeholder="🎮" className="rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-center text-white" />
+                                        <select value={entry.roleId} onChange={(event) => setReactionEntries((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, roleId: event.target.value } : item))} className="rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white"><option value="">Choose a role</option>{reactionRoles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}</select>
+                                    </div>)}
+                                </div>
+                                {reactionEntries.length < 20 && <button type="button" onClick={() => setReactionEntries((current) => [...current, { roleId: "", emoji: "" }])} className="mt-3 text-sm font-semibold text-discord-green">+ Add another reaction</button>}
+                                <button type="button" onClick={() => void saveReactionPanel()} disabled={reactionSaving} className="mt-5 w-full rounded-lg bg-discord-green px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{reactionSaving ? "Posting embed…" : "Post reaction role embed"}</button>
+                            </div>
+                            <div className="overflow-hidden rounded-2xl border border-[#1e1f22] bg-[#313338] text-[#dbdee1] shadow-xl">
+                                <div className="flex items-center gap-2 border-b border-[#1e1f22] bg-[#2b2d31] px-4 py-3"><span className="text-xl text-[#949ba4]">#</span><span className="font-semibold text-white">{reactionChannels.find((channel) => channel.id === reactionChannelId)?.name || "roles"}</span><span className="ml-auto text-xs text-[#949ba4]">Example message</span></div>
+                                <div className="flex gap-3 p-5"><div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#5865f2] font-bold text-white">P</div><div><div className="flex items-center gap-2"><span className="font-semibold text-white">Pomona</span><span className="rounded bg-[#5865f2] px-1 py-0.5 text-[0.65rem] font-semibold text-white">BOT</span></div><h3 className="mt-2 text-lg font-semibold text-white">{reactionTitle || "Choose your roles"}</h3><p className="mt-1 whitespace-pre-wrap text-sm text-[#b5bac1]">{reactionDescription || "React below to add or remove a role."}</p><div className="mt-4 flex flex-wrap gap-2">{reactionEntries.filter((entry) => entry.emoji.trim()).map((entry, index) => <span key={index} className="rounded bg-[#2b2d31] px-2 py-1 text-lg">{entry.emoji}</span>)}</div></div></div>
+                            </div>
+                            {reactionPanels.length > 0 && <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4"><h3 className="font-semibold text-white">Posted panels</h3><div className="mt-3 space-y-2">{reactionPanels.map((panel) => <div key={panel.id} className="flex items-center justify-between gap-3 text-sm"><span className="truncate text-slate-300">{panel.title}</span><div className="flex shrink-0 items-center gap-3"><span className="font-mono text-xs text-discord-green">{panel.id}</span><button type="button" onClick={() => void removeReactionPanel(panel.id)} className="text-xs font-semibold text-red-300 hover:text-red-200">Delete</button></div></div>)}</div></div>}
+                        </section>}
+
+                        {activeSystem === "economy" && <section className="mt-8 max-w-2xl space-y-5">
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Economy customization</h2>
+                                <p className="mt-1 text-sm text-slate-400">Choose the names and optional images used for currency and bank balances.</p>
+                                <label className="mt-4 block text-sm text-slate-300">Currency name<input value={economyCurrencyName} onChange={(event) => setEconomyCurrencyName(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white" /></label>
+                                <label className="mt-4 block text-sm text-slate-300">Bank name<input value={economyBankName} onChange={(event) => setEconomyBankName(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white" /></label>
+                                <label className="mt-4 block text-sm text-slate-300">Currency image URL<input type="url" value={economyCurrencyImageUrl} onChange={(event) => setEconomyCurrencyImageUrl(event.target.value)} placeholder="https://example.com/currency.png" className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white" /></label>
+                                <label className="mt-4 block text-sm text-slate-300">Bank image URL<input type="url" value={economyBankImageUrl} onChange={(event) => setEconomyBankImageUrl(event.target.value)} placeholder="https://example.com/bank.png" className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white" /></label>
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Server item catalog</h2>
+                                <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_9rem_7rem_auto]">
+                                    <input value={newEconomyItem.item} onChange={(event) => setNewEconomyItem((current) => ({ ...current, item: event.target.value }))} placeholder="Item name" className="rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                    <select value={newEconomyItem.game} onChange={(event) => setNewEconomyItem((current) => ({ ...current, game: event.target.value as EconomyItemDefinition["game"] }))} className="rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white"><option value="scavenger-hunt">Scavenger</option><option value="fishing">Fishing</option><option value="farming">Farming</option></select>
+                                    <input type="number" min={1} value={newEconomyItem.value} onChange={(event) => setNewEconomyItem((current) => ({ ...current, value: Number(event.target.value) }))} className="rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                    <button type="button" onClick={() => { if (!guildId || !newEconomyItem.item.trim()) return; void createEconomyItem(guildId, newEconomyItem).then((item) => { setEconomyItems((current) => [...current.filter((entry) => entry.id !== item.id), item]); setNewEconomyItem({ item: "", game: "scavenger-hunt", value: 10 }); }).catch((err) => setError(err instanceof ApiError ? err.message : "Failed to add economy item.")); }} className="rounded-lg bg-discord-green px-3 py-2 text-sm font-semibold text-white">Add</button>
+                                </div>
+                                <div className="mt-5 space-y-2">
+                                    {economyItems.map((item) => <div key={item.id} className="grid items-center gap-2 sm:grid-cols-[1fr_9rem_7rem_auto]">
+                                        <span className="text-sm text-white">{item.item}</span>
+                                        <select value={item.game} onChange={(event) => { if (!guildId) return; void updateEconomyItem(guildId, item.id, { game: event.target.value as EconomyItemDefinition["game"] }).then((updated) => setEconomyItems((current) => current.map((entry) => entry.id === updated.id ? updated : entry))).catch((err) => setError(err instanceof ApiError ? err.message : "Failed to update economy item.")); }} className="rounded-lg border border-white/15 bg-[#121722] px-2 py-2 text-xs text-white"><option value="scavenger-hunt">Scavenger</option><option value="fishing">Fishing</option><option value="farming">Farming</option></select>
+                                        <input type="number" min={1} value={item.value} onChange={(event) => { if (!guildId) return; void updateEconomyItem(guildId, item.id, { value: Number(event.target.value) }).then((updated) => setEconomyItems((current) => current.map((entry) => entry.id === updated.id ? updated : entry))).catch((err) => setError(err instanceof ApiError ? err.message : "Failed to update economy item.")); }} className="rounded-lg border border-white/15 bg-[#121722] px-2 py-2 text-xs text-white" />
+                                        <button type="button" onClick={() => { if (!guildId) return; void deleteEconomyItem(guildId, item.id).then(() => setEconomyItems((current) => current.filter((entry) => entry.id !== item.id))).catch((err) => setError(err instanceof ApiError ? err.message : "Failed to delete economy item.")); }} className="text-xs font-semibold text-red-300 hover:text-red-200">Remove</button>
+                                    </div>)}
+                                </div>
+                            </div>
                         </section>}
 
                         {activeSystem === "birthdays" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
@@ -272,7 +517,85 @@ export function GuildManagement() {
                             </label>
                         </section>}
 
+                        {activeSystem === "serverStats" && <section className="mt-5 space-y-5">
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Category placement</h2>
+                                <p className="mt-1 text-sm text-slate-400">Choose the exact gap where the server stats category should be placed.</p>
+                                <div className="mt-4 rounded-lg border border-white/10 bg-[#121722] p-3">
+                                    {placementGaps(channels, String(settings.statsCategoryId ?? ""), statsPlacement, setStatsPlacement)}
+                                </div>
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Server stats voice channels</h2>
+                                <p className="mt-1 text-sm text-slate-400">Choose existing voice channels or create missing ones. Members can see them but cannot connect; non-verified members cannot see them.</p>
+                                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                                    {([["statsAllChannel", "Total Members"], ["statsUsersChannel", "Users"], ["statsBotsChannel", "Bots"]] as Array<[keyof GuildSettings, string]>).map(([key, label]) => <label key={key} className="block text-sm text-slate-300">{label}
+                                        <select value={String(settings[key] ?? "")} onChange={(event) => updateSetting(key, event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                            {channelOptions(channels.filter((channel) => channel.type === 2))}
+                                        </select>
+                                    </label>)}
+                                </div>
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Create missing channels</h2>
+                                <p className="mt-1 text-sm text-slate-400">The bot will create voice channels with these names and apply the verified/non-verified visibility rules.</p>
+                                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                                    <input value={statsAllName} onChange={(event) => setStatsAllName(event.target.value)} placeholder="Total Members" className="rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                    <input value={statsUsersName} onChange={(event) => setStatsUsersName(event.target.value)} placeholder="Users" className="rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                    <input value={statsBotsName} onChange={(event) => setStatsBotsName(event.target.value)} placeholder="Bots" className="rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                </div>
+                                <label className="mt-4 flex items-center gap-3 text-sm text-slate-300"><input type="checkbox" checked={statsCreateMissing} onChange={(event) => setStatsCreateMissing(event.target.checked)} className="h-5 w-5 accent-discord-green" />Create any missing channels when saving</label>
+                                <p className="mt-3 text-xs text-slate-500">Configure the verified and non-verified roles in your guild settings before creating channels.</p>
+                            </div>
+                        </section>}
+
+                        {activeSystem === "leveling" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
+                            <label className="flex items-center justify-between gap-4">
+                                <span>
+                                    <span className="block font-semibold text-white">Leveling system</span>
+                                    <span className="mt-1 block text-sm text-slate-400">Award XP for chatting and enable the /level rank and leaderboard commands.</span>
+                                </span>
+                                <input
+                                    type="checkbox"
+                                    checked={Boolean(settings.levelEnabled)}
+                                    onChange={(event) => updateSetting("levelEnabled", event.target.checked)}
+                                    className="h-5 w-5 accent-discord-green"
+                                />
+                            </label>
+                            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                                {([["levelFirstReward", "1st place XP", 1200], ["levelSecondReward", "2nd place XP", 900], ["levelThirdReward", "3rd place XP", 700], ["levelParticipantReward", "Top 10 participation coins", 100]] as Array<[keyof GuildSettings, string, number]>).map(([key, label, fallback]) => <label key={key} className="block text-sm text-slate-300">{label}<input type="number" min={0} value={Number(settings[key] ?? fallback)} onChange={(event) => updateSetting(key, Number(event.target.value))} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" /></label>)}
+                            </div>
+                        </section>}
+
                         {activeSystem === "welcome" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
+                            <h2 className="font-semibold text-white">Welcome format</h2>
+                            <p className="mt-1 text-sm text-slate-400">Preview and choose how new members receive the welcome.</p>
+                            <select value={settings.welcomeMode ?? "image"} onChange={(event) => updateSetting("welcomeMode", event.target.value as WelcomeMode)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                <option value="text">Regular message</option>
+                                <option value="embed">Embed</option>
+                                <option value="image">Image welcome</option>
+                                <option value="container">Editable container</option>
+                            </select>
+                            {settings.welcomeMode === "embed" && <div className="mt-4 space-y-3">
+                                <input value={settings.welcomeEmbedTitle ?? ""} onChange={(event) => updateSetting("welcomeEmbedTitle", event.target.value)} placeholder="Embed title" className="w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <textarea value={settings.welcomeEmbedDescription ?? ""} onChange={(event) => updateSetting("welcomeEmbedDescription", event.target.value)} placeholder="Embed description. Use {member} and {guild}." rows={4} className="w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <input value={settings.welcomeEmbedAuthor ?? ""} onChange={(event) => updateSetting("welcomeEmbedAuthor", event.target.value)} placeholder="Author name (optional)" className="w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <textarea value={embedFieldsText(settings.welcomeEmbedFields ?? "[]")} onChange={(event) => updateSetting("welcomeEmbedFields", embedFieldsJson(event.target.value))} placeholder="Fields: Name | Value | inline" rows={4} className="w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <label className="flex items-center gap-3 text-sm text-slate-300"><input type="checkbox" checked={Boolean(settings.welcomeEmbedTimestamp)} onChange={(event) => updateSetting("welcomeEmbedTimestamp", event.target.checked)} className="h-5 w-5 accent-discord-green" />Add timestamp</label>
+                                <label className="block text-sm text-slate-300">Embed color<input type="color" value={settings.welcomeEmbedColor ?? "#5865F2"} onChange={(event) => updateSetting("welcomeEmbedColor", event.target.value)} className="mt-2 h-10 w-full rounded-lg bg-[#121722]" /></label>
+                                <div className="rounded-lg border-l-4 p-4" style={{ borderColor: settings.welcomeEmbedColor ?? "#5865F2" }}><h3 className="font-semibold text-white">{settings.welcomeEmbedTitle || "Welcome!"}</h3><p className="mt-2 whitespace-pre-wrap text-sm text-slate-300">{(settings.welcomeEmbedDescription || welcomePreviewMessage).replaceAll("{member}", `@${user?.username || "new-member"}`).replaceAll("{guild}", guildName || "your server")}</p></div><button type="button" className="mt-4 rounded-[3px] bg-[#4e5058] px-3 py-1.5 text-sm font-medium text-white">👋 Wave to say hi!</button>
+                            </div>}
+                            {settings.welcomeMode === "text" && <div className="mt-4 rounded-lg bg-[#121722] p-4 text-sm text-slate-200">{welcomePreviewMessage}<button type="button" className="mt-4 block rounded-[3px] bg-[#4e5058] px-3 py-1.5 text-sm font-medium text-white">👋 Wave to say hi!</button></div>}
+                            {settings.welcomeMode === "container" && <div className="mt-4 rounded-xl border border-white/15 bg-[#1e1f22] p-4 text-sm text-slate-200"><div className="rounded-lg border border-white/10 bg-[#313338] p-4">{welcomePreviewMessage}<button type="button" className="mt-4 block rounded-[3px] bg-[#4e5058] px-3 py-1.5 text-sm font-medium text-white">👋 Wave to say hi!</button></div></div>}
+                            {settings.welcomeMode === "container" && <div className="mt-4 space-y-3">
+                                <textarea value={settings.welcomeContainerExtraText ?? ""} onChange={(event) => updateSetting("welcomeContainerExtraText", event.target.value)} placeholder="Extra container text" rows={3} className="w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <input value={settings.welcomeContainerImageUrl ?? ""} onChange={(event) => updateSetting("welcomeContainerImageUrl", event.target.value)} placeholder="Single image URL (optional)" className="w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <textarea value={settings.welcomeContainerGalleryUrls ?? ""} onChange={(event) => updateSetting("welcomeContainerGalleryUrls", event.target.value)} placeholder="Gallery image URLs, one per line" rows={3} className="w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                                <label className="flex items-center gap-3 text-sm text-slate-300"><input type="checkbox" checked={settings.welcomeContainerSeparators !== false} onChange={(event) => updateSetting("welcomeContainerSeparators", event.target.checked)} className="h-5 w-5 accent-discord-green" />Use separators between container sections</label>
+                            </div>}
+                        </section>}
+
+                        {activeSystem === "welcome" && (settings.welcomeMode ?? "image") === "image" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
                             <label htmlFor="welcome-background" className="block font-semibold text-white">Welcome background image</label>
                             <span className="mt-1 block text-sm text-slate-400">Use a publicly accessible HTTPS image URL. Leave blank to use Orchard&apos;s default.</span>
                             <input
@@ -325,9 +648,9 @@ export function GuildManagement() {
                             <span className="mt-2 block text-xs text-slate-500">This Discord-style preview includes the greeting, image, and wave button Pomona sends.</span>
                         </section>}
 
-                        {activeSystem === "welcome" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
-                            <span className="mt-3 block font-semibold text-white">Bot welcome message</span>
-                            <span className="mt-1 block text-sm text-slate-400">Customize the message sent with the welcome canvas.</span>
+                        {activeSystem === "welcome" && settings.welcomeMode !== "embed" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
+                            <span className="mt-3 block font-semibold text-white">{settings.welcomeMode === "container" ? "Container content" : settings.welcomeMode === "text" ? "Regular message" : "Image welcome message"}</span>
+                            <span className="mt-1 block text-sm text-slate-400">Edit the content sent with this welcome format.</span>
                             <label className="mt-4 flex items-center gap-3 text-sm text-slate-300">
                                 <input
                                     type="checkbox"
