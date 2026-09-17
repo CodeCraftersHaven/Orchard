@@ -1,9 +1,17 @@
+import { IntegrationContextType, publishConfig } from "#plugins";
 import { commandModule, CommandType } from "@sern/handler";
-import { ApplicationCommandOptionType, ChannelType, TextChannel } from "discord.js";
+import { ApplicationCommandOptionType, ChannelType, PermissionFlagsBits, TextChannel } from "discord.js";
 
 export default commandModule({
     type: CommandType.Both,
     description: "Announce a message to the server",
+    plugins: [
+        publishConfig({
+            contexts: [IntegrationContextType.GUILD],
+            integrationTypes: ["Guild"],
+            defaultMemberPermissions: PermissionFlagsBits.Administrator
+        })
+    ],
     options: [
         {
             name: "message",
@@ -21,6 +29,9 @@ export default commandModule({
     ],
     execute: async (ctx) => {
         if (ctx.isMessage()) {
+            if (!ctx.message.member?.permissions.has(PermissionFlagsBits.Administrator)) {
+                return;
+            }
             const args = ctx.message.content.trim().split(/\s+/).slice(1);
             const channelMention = args[0]?.match(/^<#(\d+)>$/);
             const channel = (channelMention
@@ -41,6 +52,7 @@ export default commandModule({
                     ]
                 });
             }
+            await ctx.message.delete();
         } else if (ctx.isSlash()) {
             const message = ctx.interaction.options.getString("message", true);
             const channel = (ctx.interaction.options.getChannel("channel", false) || ctx.channel) as TextChannel;
