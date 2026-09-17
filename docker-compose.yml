@@ -1,4 +1,19 @@
 services:
+  db-push:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: migrate
+      args:
+        NODE_ENV: production
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+    networks:
+      - db-net
+
   api:
     build:
       context: .
@@ -10,8 +25,11 @@ services:
         API_BASE_URL: ${API_BASE_URL}
         DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
     restart: always
+    depends_on:
+      db-push:
+        condition: service_completed_successfully
     env_file:
-      - .env.production
+      - .env
     environment:
       NODE_ENV: production
     extra_hosts:
@@ -33,7 +51,7 @@ services:
         DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
     restart: always
     env_file:
-      - .env.production
+      - .env
     environment:
       NODE_ENV: production
     extra_hosts:
@@ -54,8 +72,11 @@ services:
         API_BASE_URL: ${API_BASE_URL}
         DISCORD_REDIRECT_URI: ${DISCORD_REDIRECT_URI}
     restart: always
+    depends_on:
+      db-push:
+        condition: service_completed_successfully
     env_file:
-      - .env.production
+      - .env
     environment:
       NODE_ENV: production
     extra_hosts:

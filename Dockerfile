@@ -19,8 +19,13 @@ RUN npm install --include=dev
 RUN npm install -g serve @sern/cli
 
 RUN npm run database:generate
-RUN npm run database:db-push
 RUN npm run build
+
+# --- Migrate Stage (one-off db-push, run manually or via docker-compose job) ---
+FROM node:22-alpine AS migrate
+WORKDIR /app
+COPY --from=builder /app /app
+CMD ["npm", "run", "database:db-push"]
 
 # --- API Production Stage ---
 FROM node:22-alpine AS api
