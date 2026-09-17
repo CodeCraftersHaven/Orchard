@@ -42,7 +42,7 @@ export default eventModule({
                 await message.channel.sendTyping().catch(() => undefined);
                 await delay(5);
                 const response = await message.reply(reset ? `${randomCountMessage(repeatCountMessages, { user: message.author.username })} You counted twice in a row, so the counter has reset. The next number is **1**.` : `${randomMessage(raceCountMessages)} The next number is **1**.`).catch(() => undefined);
-                if (response) deleteOnTimeout(response, 20_000);
+                if (response) deleteOnTimeout(response, 10_000);
                 return null;
             }
             if (evaluateCountExpression(submittedCount) !== nextCount) {
@@ -54,7 +54,7 @@ export default eventModule({
                 await message.channel.sendTyping().catch(() => undefined);
                 await delay(5);
                 const response = await message.reply(reset ? `${randomCountMessage(wrongCountMessages, { expected: String(nextCount) })}${recordMessage} The counter has reset. The next number is **1**.` : `${randomMessage(raceCountMessages)} The next number is **1**.`).catch(() => undefined);
-                if (response) deleteOnTimeout(response, 20_000);
+                if (response) deleteOnTimeout(response, 10_000);
                 return null;
             }
 
@@ -85,11 +85,13 @@ export default eventModule({
                 return true;
             });
             if (!counted) {
-                await message.react(randomMessage(failEmojis)).catch(() => undefined);
+                if (Number.isNaN(Number(submittedCount))) {
+                    await message.delete().catch(() => undefined);
+                }
                 await message.channel.sendTyping().catch(() => undefined);
-                await delay(5);
+                await delay(3);
                 const response = await message.reply(`${randomMessage(raceCountMessages)} Please try the next number.`).catch(() => undefined);
-                if (response) deleteOnTimeout(response, 20_000);
+                if (response) deleteOnTimeout(response, 10_000);
             } else await message.react(nextCount === 100 ? '💯' : randomMessage(checkEmojis)).catch(() => undefined);
             return null;
         }
