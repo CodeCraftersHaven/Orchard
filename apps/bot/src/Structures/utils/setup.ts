@@ -27,7 +27,7 @@ import {
     type StringSelectMenuInteraction,
 } from 'discord.js';
 
-export type SetupSystem = 'welcome' | 'birthdays' | 'counting' | 'server-stats' | 'leveling' | 'reaction-roles' | 'economy';
+export type SetupSystem = 'welcome' | 'birthdays' | 'counting' | 'server-stats' | 'leveling' | 'reaction-roles' | 'verification' | 'economy';
 type SetupInteraction = ButtonInteraction | ChannelSelectMenuInteraction | ModalSubmitInteraction | RoleSelectMenuInteraction | StringSelectMenuInteraction;
 const positions = ['left', 'middle', 'right'] as const;
 
@@ -46,6 +46,7 @@ function systemSelector(selected?: SetupSystem) {
             { label: 'Server stats', value: 'server-stats', description: 'Configure visible voice-channel member statistics.', default: selected === 'server-stats' },
             { label: 'Leveling', value: 'leveling', description: 'Configure weekly XP rewards.', default: selected === 'leveling' },
             { label: 'Reaction roles', value: 'reaction-roles', description: 'Manage reaction-role panels.', default: selected === 'reaction-roles' },
+            { label: 'Verification', value: 'verification', description: 'Create a reaction-based member verification panel.', default: selected === 'verification' },
             { label: 'Economy', value: 'economy', description: 'Customize currency and bank settings.', default: selected === 'economy' },
         ])
     );
@@ -64,6 +65,7 @@ const systemLabels: Record<SetupSystem, string> = {
     'server-stats': 'Server stats',
     leveling: 'Leveling',
     'reaction-roles': 'Reaction roles',
+    verification: 'Verification',
     economy: 'Economy',
 };
 
@@ -113,6 +115,12 @@ const systemDefinitions: Record<SetupSystem, SystemDefinition> = {
     'reaction-roles': {
         enable: async () => { },
         disable: async (prisma, guildId) => { await prisma.reactionRole.deleteMany({ where: { gID: guildId } }); },
+    },
+    verification: {
+        enable: async () => { },
+        disable: async (prisma, guildId) => {
+            await prisma.guild.updateMany({ where: { gID: guildId }, data: { verifiedRole: '', nonVerifiedRoleId: '', reactionMessageId: '' } });
+        },
     },
     economy: {
         enable: async () => { },
@@ -313,6 +321,31 @@ async function postSystemPanel(interaction: ModalSubmitInteraction, system: Setu
     await interaction.reply({ content: `${systemLabels[system]} enabled in <#${channel.id}>.`, flags: MessageFlags.Ephemeral });
 }
 
+async function createVerificationPanel(interaction: ButtonInteraction, prisma: PrismaClient) {
+    const guild = interaction.guild;
+    if (!guild) return;
+    const settings = await prisma.guild.findUnique({ where: { gID: guild.id } });
+    const panel = await setupPanel(prisma, guild.id, 'verification');
+    const channel = guild.channels.cache.get(panel?.channelId ?? '');
+    if (!(channel instanceof BaseGuildTextChannel)) return interaction.reply({ content: 'Choose a verification channel first.', flags: MessageFlags.Ephemeral });
+    if (!settings?.verifiedRole || !settings.nonVerifiedRoleId) return interaction.reply({ content: 'Choose both verified and non-verified roles first.', flags: MessageFlags.Ephemeral });
+    if (panel?.messageId) return interaction.reply({ content: `The verification panel is already posted in <#${panel.channelId}>.`, flags: MessageFlags.Ephemeral });
+    const message = await channel.send({ embeds: [new EmbedBuilder()
+        .setTitle('Member verification')
+        .setDescription('React with any emoji to verify and unlock the server.')
+        .setColor(0x57f287)] });
+    await message.react('✅');
+    await prisma.$transaction([
+        prisma.guild.update({ where: { gID: guild.id }, data: { reactionMessageId: message.id } }),
+        prisma.systemSetupPanel.upsert({
+            where: { gID_system: { gID: guild.id, system: 'verification' } },
+            update: { messageId: message.id },
+            create: { id: setupPanelId(guild.id, 'verification'), gID: guild.id, system: 'verification', channelId: channel.id, messageId: message.id },
+        }),
+    ]);
+    return interaction.update({ components: [await buildSetupContainer('verification', guild.id, prisma)], flags: MessageFlags.IsComponentsV2 });
+}
+
 export function buildSetupOverview() {
     return new ContainerBuilder()
         .addTextDisplayComponents(new TextDisplayBuilder().setContent('## Pomona setup\nChoose a system below to manage it. You can switch systems at any time.'))
@@ -413,6 +446,18 @@ Non-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}
             .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-leveling-rewards').setLabel('Edit weekly rewards').setStyle(ButtonStyle.Primary)))
             .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-enable/leveling').setLabel(settings.enabled ? 'Enabled' : 'Enable leveling').setStyle(settings.enabled ? ButtonStyle.Secondary : ButtonStyle.Success)))
             .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-disable/leveling').setLabel('Disable and remove leveling').setStyle(ButtonStyle.Danger)))
+            .addActionRowComponents(overviewButton());
+    }
+    if (system === 'verification') {
+        const guild = await prisma.guild.findUnique({ where: { gID: guildId } });
+        const panel = await setupPanel(prisma, guildId, system);
+        return container
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Verification\n${panel?.messageId ? `Panel: **Enabled in <#${panel.channelId}>**` : 'Panel: **Not posted**'}\n\nVerified role: **${guild?.verifiedRole ? `<@&${guild.verifiedRole}>` : 'Not configured'}**\nNon-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}>` : 'Not configured'}**`))
+            .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-channel/verification').setPlaceholder('Choose verification channel').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(panel?.channelId ? [panel.channelId] : [])))
+            .addActionRowComponents(new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(new RoleSelectMenuBuilder().setCustomId('setup-verification-verified-role').setPlaceholder('Choose verified role').setMinValues(1).setMaxValues(1).setDefaultRoles(guild?.verifiedRole ? [guild.verifiedRole] : [])))
+            .addActionRowComponents(new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(new RoleSelectMenuBuilder().setCustomId('setup-verification-nonverified-role').setPlaceholder('Choose non-verified role').setMinValues(1).setMaxValues(1).setDefaultRoles(guild?.nonVerifiedRoleId ? [guild.nonVerifiedRoleId] : [])))
+            .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-verification-create').setLabel(panel?.messageId ? 'Panel already posted' : 'Create verification panel').setStyle(panel?.messageId ? ButtonStyle.Secondary : ButtonStyle.Success).setDisabled(Boolean(panel?.messageId))))
+            .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-disable/verification').setLabel('Disable verification').setStyle(ButtonStyle.Danger)))
             .addActionRowComponents(overviewButton());
     }
     if (system === 'economy') {
@@ -551,10 +596,20 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
     if (interaction.isRoleSelectMenu() && interaction.customId === 'setup-reaction-roles') {
         return createReactionPanelFromRoles(interaction, deps.prisma);
     }
+    if (interaction.isRoleSelectMenu() && (interaction.customId === 'setup-verification-verified-role' || interaction.customId === 'setup-verification-nonverified-role')) {
+        const field = interaction.customId === 'setup-verification-verified-role' ? 'verifiedRole' : 'nonVerifiedRoleId';
+        await deps.prisma.guild.upsert({
+            where: { gID: interaction.guildId! },
+            update: { [field]: interaction.values[0] },
+            create: { gID: interaction.guildId!, gName: interaction.guild?.name ?? 'Guild', [field]: interaction.values[0] },
+        });
+        return interaction.update({ components: [await buildSetupContainer('verification', interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
+    }
     if (interaction.isButton()) {
         if (interaction.customId === 'setup-overview') return interaction.update({ components: [buildSetupOverview()], flags: MessageFlags.IsComponentsV2 });
         if (interaction.customId === 'setup-reaction-create') return interaction.showModal(reactionCreateModal());
         if (interaction.customId === 'setup-stats-create') return interaction.showModal(serverStatsModal());
+        if (interaction.customId === 'setup-verification-create') return createVerificationPanel(interaction, deps.prisma);
         if (interaction.customId === 'setup-leveling-rewards') {
             const settings = await deps.prisma.levelSettings.upsert({ where: { gID: interaction.guildId! }, update: {}, create: { gID: interaction.guildId! } });
             return interaction.showModal(levelingModal(settings));

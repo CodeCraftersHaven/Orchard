@@ -103,6 +103,8 @@ export const createReactionRolePanel = (guildId: string, panel: { channelId: str
   });
 export const deleteReactionRolePanel = (guildId: string, panelId: string) =>
   apiFetch<{ deleted: boolean }>(`/guilds/${guildId}/reaction-roles/${panelId}`, { method: "DELETE" });
+export const createVerificationPanel = (guildId: string, settings: { channelId: string; verifiedRole: string; nonVerifiedRoleId: string }) =>
+  apiFetch<{ messageId: string }>(`/guilds/${guildId}/verification`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
 export const getEconomyItems = (guildId: string) => apiFetch<EconomyItemDefinition[]>(`/guilds/${guildId}/economy/items`);
 export const createEconomyItem = (guildId: string, item: { item: string; game: EconomyItemDefinition["game"]; value: number }) =>
   apiFetch<EconomyItemDefinition>(`/guilds/${guildId}/economy/items`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) });

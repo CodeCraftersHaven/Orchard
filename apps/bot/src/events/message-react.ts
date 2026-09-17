@@ -13,16 +13,22 @@ export default eventModule({
     execute: async (reaction: MessageReaction, user: User) => {
         if (user.bot || !reaction.message.guildId) return;
         const prisma = Service('prisma');
-        const panel = await prisma.reactionRole.findFirst({
-            where: { gID: reaction.message.guildId, messageId: reaction.message.id },
-            include: { roles: true },
-        });
+        const [panel, verificationGuild] = await Promise.all([
+            prisma.reactionRole.findFirst({
+                where: { gID: reaction.message.guildId, messageId: reaction.message.id },
+                include: { roles: true },
+            }),
+            prisma.guild.findUnique({ where: { gID: reaction.message.guildId } }),
+        ]);
         const entry = panel?.roles.find((role) => role.emoji === reactionKey(reaction) || role.emoji === reaction.emoji.name);
-        if (!entry) return;
-        const member = await reaction.message.guild?.members.fetch(user.id);
-        const role = reaction.message.guild?.roles.cache.get(entry.roleId);
-        if (!member || !role) return;
-        await member.roles.add(role).catch(() => undefined);
+        const isVerificationReaction = verificationGuild?.reactionMessageId === reaction.message.id;
+        if (!entry && !isVerificationReaction) return;
+        if (entry) {
+            const member = await reaction.message.guild?.members.fetch(user.id);
+            const role = reaction.message.guild?.roles.cache.get(entry.roleId);
+            if (!member || !role) return;
+            await member.roles.add(role).catch(() => undefined);
+        }
 
         //verification system
         if (!reaction.message.inGuild()) return;

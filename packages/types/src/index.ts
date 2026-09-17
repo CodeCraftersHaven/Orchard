@@ -171,6 +171,8 @@ export interface GuildSettings {
     statsUsersName?: string;
     statsBotsName?: string;
     statsPlacement?: string;
+    verificationChannelId: string;
+    verificationPanelMessageId: string;
 }
 
 export interface GuildSettingsResponse {

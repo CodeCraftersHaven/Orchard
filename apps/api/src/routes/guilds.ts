@@ -13,6 +13,7 @@ import {
   hasAdministratorPermission,
   guildIconUrl,
   createBotEmbedMessage,
+  addBotReaction,
 } from "../lib/discord.js";
 
 const channelFieldLabels: Record<string, string> = {
@@ -84,7 +85,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
           return reply.code(409).send({ error: "The bot is not in this server." });
         }
 
-        const [guild, birthday, counter, welcome, botWelcome, economy, levelSettings, stats, channels, roles] = await Promise.all([
+        const [guild, birthday, counter, welcome, botWelcome, economy, levelSettings, stats, verificationPanel, channels, roles] = await Promise.all([
           fastify.prisma.guild.findUnique({ where: { gID: guildId } }),
           fastify.prisma.birthday.findUnique({ where: { gID: guildId }, include: { settings: true } }),
           fastify.prisma.counter.findUnique({ where: { gID: guildId } }),
@@ -93,6 +94,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
           fastify.prisma.economySettings.findUnique({ where: { gID: guildId } }),
           fastify.prisma.levelSettings.findUnique({ where: { gID: guildId } }),
           fastify.prisma.serverStats.findUnique({ where: { gID: guildId } }),
+          fastify.prisma.systemSetupPanel.findUnique({ where: { gID_system: { gID: guildId, system: "verification" } } }),
           getBotGuildChannels(guildId),
           getBotGuildRoles(guildId),
         ]);
@@ -138,6 +140,8 @@ export default async function guildRoutes(fastify: FastifyInstance) {
             statsUsersChannel: stats?.userCountChan ?? "",
             statsBotsChannel: stats?.botCountChan ?? "",
             statsCategoryId: stats?.categoryId ?? "",
+            verificationChannelId: verificationPanel?.channelId ?? "",
+            verificationPanelMessageId: verificationPanel?.messageId ?? "",
           },
           channels: channels
             .map((channel) => ({
@@ -151,6 +155,39 @@ export default async function guildRoutes(fastify: FastifyInstance) {
       } catch (err) {
         fastify.log.error(err);
         return reply.code(502).send({ error: "Failed to load guild settings" });
+      }
+    },
+  );
+
+  fastify.post<{
+    Params: { guildId: string };
+    Body: { channelId?: string; verifiedRole?: string; nonVerifiedRoleId?: string };
+  }>(
+    "/:guildId/verification",
+    { preHandler: fastify.authenticate },
+    async (request, reply) => {
+      const { guildId } = request.params;
+      try {
+        const userGuilds = await getCurrentUserGuilds(request.user.accessToken);
+        const userGuild = userGuilds.find((guild) => guild.id === guildId);
+        if (!userGuild || !hasAdministratorPermission(userGuild)) return reply.code(403).send({ error: "Administrator permissions are required." });
+        if (!(await getBotGuildIds()).has(guildId)) return reply.code(409).send({ error: "The bot is not in this server." });
+        const channelId = request.body.channelId?.trim();
+        const verifiedRole = request.body.verifiedRole?.trim();
+        const nonVerifiedRoleId = request.body.nonVerifiedRoleId?.trim();
+        if (!channelId || !verifiedRole || !nonVerifiedRoleId) return reply.code(400).send({ error: "A verification channel, verified role, and non-verified role are required." });
+        const existingPanel = await fastify.prisma.systemSetupPanel.findUnique({ where: { gID_system: { gID: guildId, system: "verification" } } });
+        if (existingPanel?.messageId) return reply.code(409).send({ error: "A verification panel is already configured." });
+        const message = await createBotEmbedMessage(channelId, "Member verification", "React with any emoji to verify and unlock the server.");
+        await addBotReaction(channelId, message.id, "✅");
+        await fastify.prisma.$transaction([
+          fastify.prisma.guild.upsert({ where: { gID: guildId }, update: { verifiedRole, nonVerifiedRoleId, reactionMessageId: message.id }, create: { gID: guildId, gName: userGuild.name, verifiedRole, nonVerifiedRoleId, reactionMessageId: message.id } }),
+          fastify.prisma.systemSetupPanel.upsert({ where: { gID_system: { gID: guildId, system: "verification" } }, update: { channelId, messageId: message.id }, create: { id: `${guildId}-verification`, gID: guildId, system: "verification", channelId, messageId: message.id } }),
+        ]);
+        return { messageId: message.id };
+      } catch (err) {
+        fastify.log.error(err);
+        return reply.code(502).send({ error: "Failed to create verification panel" });
       }
     },
   );
@@ -443,6 +480,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
           if (system === "serverStats") await transaction.serverStats.deleteMany({ where: { gID: guildId } });
           if (system === "leveling") await transaction.levelSettings.deleteMany({ where: { gID: guildId } });
           if (system === "reactionRoles") await transaction.reactionRole.deleteMany({ where: { gID: guildId } });
+          if (system === "verification") await transaction.guild.updateMany({ where: { gID: guildId }, data: { verifiedRole: "", nonVerifiedRoleId: "", reactionMessageId: "" } });
           if (system === "economy") {
             await transaction.economyListing.deleteMany({ where: { serverId: guildId } });
             await transaction.economyItemDefinition.deleteMany({ where: { serverId: guildId } });

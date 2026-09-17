@@ -13,6 +13,7 @@ import {
     getReactionRoles,
     createReactionRolePanel,
     deleteReactionRolePanel,
+    createVerificationPanel,
     saveGuildSettings,
     disableGuildSystem,
     getEconomyItems,
@@ -76,6 +77,11 @@ const systemGroups = {
     reactionRoles: {
         label: "Reaction roles",
         description: "Create Discord embed menus that grant roles when members react.",
+        fields: [] as Array<keyof GuildSettings>,
+    },
+    verification: {
+        label: "Verification",
+        description: "Create a reaction-based panel for new members to verify themselves.",
         fields: [] as Array<keyof GuildSettings>,
     },
 } as const;
@@ -177,11 +183,16 @@ export function GuildManagement() {
     const [reactionPanels, setReactionPanels] = useState<ReactionRolePanel[]>([]);
     const [reactionChannels, setReactionChannels] = useState<GuildChannel[]>([]);
     const [reactionRoles, setReactionRoles] = useState<GuildRole[]>([]);
+    const [guildRoles, setGuildRoles] = useState<GuildRole[]>([]);
     const [reactionTitle, setReactionTitle] = useState("Choose your roles");
     const [reactionDescription, setReactionDescription] = useState("React below to add or remove a role.");
     const [reactionChannelId, setReactionChannelId] = useState("");
     const [reactionEntries, setReactionEntries] = useState<Array<{ roleId: string; emoji: string }>>([{ roleId: "", emoji: "🎮" }]);
     const [reactionSaving, setReactionSaving] = useState(false);
+    const [verificationChannelId, setVerificationChannelId] = useState("");
+    const [verificationVerifiedRole, setVerificationVerifiedRole] = useState("");
+    const [verificationNonVerifiedRole, setVerificationNonVerifiedRole] = useState("");
+    const [verificationSaving, setVerificationSaving] = useState(false);
     const [economyCurrencyName, setEconomyCurrencyName] = useState("Coins");
     const [economyBankName, setEconomyBankName] = useState("Bank");
     const [economyCurrencyImageUrl, setEconomyCurrencyImageUrl] = useState("");
@@ -201,7 +212,11 @@ export function GuildManagement() {
             .then((response) => {
                 setGuildName(response.guild.gName);
                 setChannels(response.channels);
+                setGuildRoles(response.roles);
                 setSettings(response.guild);
+                setVerificationChannelId(response.guild.verificationChannelId ?? "");
+                setVerificationVerifiedRole(response.guild.verifiedRole ?? "");
+                setVerificationNonVerifiedRole(response.guild.nonVerifiedRoleId ?? "");
                 setEconomyCurrencyName(response.guild.economyCurrencyName ?? "Coins");
                 setEconomyBankName(response.guild.economyBankName ?? "Bank");
                 setEconomyCurrencyImageUrl(response.guild.economyCurrencyImageUrl ?? "");
@@ -358,6 +373,24 @@ export function GuildManagement() {
             setNotice("Reaction role embed deleted.");
         } catch (err) {
             setError(err instanceof ApiError ? err.message : "Failed to delete reaction role embed.");
+        }
+    };
+
+    const saveVerificationPanel = async () => {
+        if (!guildId || !verificationChannelId || !verificationVerifiedRole || !verificationNonVerifiedRole) {
+            setError("Choose a verification channel, verified role, and non-verified role first.");
+            return;
+        }
+        setVerificationSaving(true);
+        setError(null);
+        try {
+            await createVerificationPanel(guildId, { channelId: verificationChannelId, verifiedRole: verificationVerifiedRole, nonVerifiedRoleId: verificationNonVerifiedRole });
+            setSettings((current) => ({ ...current, verifiedRole: verificationVerifiedRole, nonVerifiedRoleId: verificationNonVerifiedRole, verificationPanelMessageId: "created" }));
+            setNotice("Verification panel created.");
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to create verification panel.");
+        } finally {
+            setVerificationSaving(false);
         }
     };
 
@@ -547,6 +580,29 @@ export function GuildManagement() {
                                 <label className="mt-4 flex items-center gap-3 text-sm text-slate-300"><input type="checkbox" checked={statsCreateMissing} onChange={(event) => setStatsCreateMissing(event.target.checked)} className="h-5 w-5 accent-discord-green" />Create any missing channels when saving</label>
                                 <p className="mt-3 text-xs text-slate-500">Configure the verified and non-verified roles in your guild settings before creating channels.</p>
                             </div>
+                        </section>}
+
+                        {activeSystem === "verification" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
+                            <h2 className="font-semibold text-white">Verification panel</h2>
+                            <p className="mt-1 text-sm text-slate-400">Post a panel that assigns the verified role when a member reacts with any emoji.</p>
+                            <div className="mt-4 grid gap-4 md:grid-cols-3">
+                                <label className="block text-sm text-slate-300">Verification channel
+                                    <select value={verificationChannelId} onChange={(event) => setVerificationChannelId(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                        {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                    </select>
+                                </label>
+                                <label className="block text-sm text-slate-300">Verified role
+                                    <select value={verificationVerifiedRole} onChange={(event) => setVerificationVerifiedRole(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                        <option value="">Choose a role</option>{guildRoles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}
+                                    </select>
+                                </label>
+                                <label className="block text-sm text-slate-300">Non-verified role
+                                    <select value={verificationNonVerifiedRole} onChange={(event) => setVerificationNonVerifiedRole(event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                        <option value="">Choose a role</option>{guildRoles.map((role) => <option key={role.id} value={role.id}>@{role.name}</option>)}
+                                    </select>
+                                </label>
+                            </div>
+                            <button type="button" onClick={() => void saveVerificationPanel()} disabled={verificationSaving || Boolean(settings.verificationPanelMessageId)} className="mt-5 rounded-lg bg-discord-green px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{verificationSaving ? "Posting panel…" : settings.verificationPanelMessageId ? "Panel already posted" : "Create verification panel"}</button>
                         </section>}
 
                         {activeSystem === "leveling" && <section className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-5">
