@@ -40,7 +40,7 @@ export default commandModule({
             const message = channelMention ? args.slice(1).join(" ") : args.join(" ");
             if (channel?.isTextBased()) {
                 await channel.send({
-                    content: `@<${ctx.guildId}>`,
+                    content: `@everyone`,
                     embeds: [
                         {
                             author: {
@@ -59,7 +59,7 @@ export default commandModule({
             const channel = (ctx.interaction.options.getChannel("channel", false) || ctx.channel) as TextChannel;
             if (channel.isTextBased()) {
                 await channel.send({
-                    content: `@<${ctx.guildId}>`,
+                    content: `@everyone`,
                     embeds: [
                         {
                             author: {
