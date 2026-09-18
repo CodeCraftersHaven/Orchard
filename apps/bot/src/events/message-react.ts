@@ -87,7 +87,7 @@ export default eventModule({
                 const welcomeChannel = mmm.guild.systemChannel
                     ?? (welcomeSettings?.channelId ? await mmm.guild.channels.fetch(welcomeSettings.channelId).catch(() => null) : null);
                 await welcomeCreate(mmm, mmm.guild.name, counts.users, welcomeChannel instanceof TextChannel ? welcomeChannel : null, {
-                    intro: Guild.announcementsChannelId,
+                    intro: Guild.introC,
                     roles: Guild.rolesChannelId
                 }).then(async () => {
                     const Verification = await prisma.member.findFirst({

@@ -607,6 +607,14 @@ export function GuildManagement() {
                                 <textarea value={setupNotes.introC ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, introC: event.target.value }))} rows={2} placeholder="Setup note for intro channel" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
                             </div>
                             <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Roles channel</h2>
+                                <p className="mt-1 text-sm text-slate-400">Where verified members are directed to choose roles.</p>
+                                <select value={String(settings.rolesChannelId ?? "")} onChange={(event) => updateSetting("rolesChannelId", event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                    {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                </select>
+                                <textarea value={setupNotes.rolesChannelId ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, rolesChannelId: event.target.value }))} rows={2} placeholder="Setup note for roles channel" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
+                            </div>
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
                                 <h2 className="font-semibold text-white">Verified role</h2>
                                 <p className="mt-1 text-sm text-slate-400">Role granted when a member reacts to the panel.</p>
                                 <select value={verificationVerifiedRole} onChange={(event) => setVerificationVerifiedRole(event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">

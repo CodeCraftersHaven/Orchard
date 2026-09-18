@@ -452,9 +452,10 @@ Non-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}
         const guild = await prisma.guild.findUnique({ where: { gID: guildId } });
         const panel = await setupPanel(prisma, guildId, system);
         return container
-            .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Verification\n${panel?.messageId ? `Panel: **Enabled in <#${panel.channelId}>**` : 'Panel: **Not posted**'}\n\nVerified role: **${guild?.verifiedRole ? `<@&${guild.verifiedRole}>` : 'Not configured'}**\nNon-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}>` : 'Not configured'}**\nIntro channel: **${guild?.introC ? `<#${guild.introC}>` : 'Not configured'}**`))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Verification\n${panel?.messageId ? `Panel: **Enabled in <#${panel.channelId}>**` : 'Panel: **Not posted**'}\n\nVerified role: **${guild?.verifiedRole ? `<@&${guild.verifiedRole}>` : 'Not configured'}**\nNon-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}>` : 'Not configured'}**\nIntro channel: **${guild?.introC ? `<#${guild.introC}>` : 'Not configured'}**\nRoles channel: **${guild?.rolesChannelId ? `<#${guild.rolesChannelId}>` : 'Not configured'}**`))
             .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-channel/verification').setPlaceholder('Choose verification channel').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(panel?.channelId ? [panel.channelId] : [])))
             .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-verification-intro').setPlaceholder('Choose intro channel').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(guild?.introC ? [guild.introC] : [])))
+            .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-verification-roles').setPlaceholder('Choose roles channel').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(guild?.rolesChannelId ? [guild.rolesChannelId] : [])))
             .addActionRowComponents(new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(new RoleSelectMenuBuilder().setCustomId('setup-verification-verified-role').setPlaceholder('Choose verified role').setMinValues(1).setMaxValues(1).setDefaultRoles(guild?.verifiedRole ? [guild.verifiedRole] : [])))
             .addActionRowComponents(new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(new RoleSelectMenuBuilder().setCustomId('setup-verification-nonverified-role').setPlaceholder('Choose non-verified role').setMinValues(1).setMaxValues(1).setDefaultRoles(guild?.nonVerifiedRoleId ? [guild.nonVerifiedRoleId] : [])))
             .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-verification-create').setLabel(panel?.messageId ? 'Panel already posted' : 'Create verification panel').setStyle(panel?.messageId ? ButtonStyle.Secondary : ButtonStyle.Success).setDisabled(Boolean(panel?.messageId))))
@@ -586,6 +587,14 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
             where: { gID: interaction.guildId! },
             update: { introC: interaction.values[0] },
             create: { gID: interaction.guildId!, gName: interaction.guild?.name ?? 'Guild', introC: interaction.values[0] },
+        });
+        return interaction.update({ components: [await buildSetupContainer('verification', interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
+    }
+    if (interaction.isChannelSelectMenu() && interaction.customId === 'setup-verification-roles') {
+        await deps.prisma.guild.upsert({
+            where: { gID: interaction.guildId! },
+            update: { rolesChannelId: interaction.values[0] },
+            create: { gID: interaction.guildId!, gName: interaction.guild?.name ?? 'Guild', rolesChannelId: interaction.values[0] },
         });
         return interaction.update({ components: [await buildSetupContainer('verification', interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
     }
