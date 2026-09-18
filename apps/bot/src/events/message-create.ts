@@ -36,6 +36,13 @@ export default eventModule({
         if (counter?.active && counter.channel === message.channel.id) {
             const nextCount = counter.count + 1;
             const submittedCount = message.content.trim();
+            const expression = submittedCount.match(/^\d[\d\s().+\-*/]*/)?.[0].trim();
+
+            if (!expression) {
+                await message.delete().catch(() => undefined);
+                return null;
+            }
+
             if (counter.lastUser === message.author.id) {
                 await message.react(randomMessage(failEmojis)).catch(() => undefined);
                 const reset = await resetCounter(prisma, message.guild.id, message.channel.id, counter.count);
@@ -45,7 +52,7 @@ export default eventModule({
                 if (response) deleteOnTimeout(response, 10_000);
                 return null;
             }
-            if (evaluateCountExpression(submittedCount) !== nextCount) {
+            if (evaluateCountExpression(expression) !== nextCount) {
                 await message.react(randomMessage(failEmojis)).catch(() => undefined);
                 const recordMessage = counter.recordPending && counter.lastUser !== message.author.id
                     ? ` 🏆 New server record: **${counter.highestCount}**!`
@@ -85,9 +92,6 @@ export default eventModule({
                 return true;
             });
             if (!counted) {
-                if (Number.isNaN(Number(submittedCount))) {
-                    await message.delete().catch(() => undefined);
-                }
                 await message.channel.sendTyping().catch(() => undefined);
                 await delay(3);
                 const response = await message.reply(`${randomMessage(raceCountMessages)} Please try the next number.`).catch(() => undefined);
