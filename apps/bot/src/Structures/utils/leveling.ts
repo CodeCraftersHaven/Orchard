@@ -1,6 +1,7 @@
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { AttachmentBuilder } from 'discord.js';
 import type { PrismaClient } from '@orchard/database';
+import { alfaFontFamily, lobsterFontFamily, registerCanvasFonts } from '#utils';
 
 export const levelingMedals = ['🥇', '🥈', '🥉'];
 
@@ -40,30 +41,39 @@ export function levelingWeekKey(date = new Date()) {
 }
 
 export async function buildLevelCard(username: string, avatarUrl: string, totalXp: number) {
+    registerCanvasFonts();
     const progress = levelFromTotalXp(totalXp);
     const canvas = createCanvas(1000, 280);
     const context = canvas.getContext('2d');
     context.fillStyle = '#20242c';
     context.fillRect(0, 0, canvas.width, canvas.height);
-    const avatar = await loadImage(avatarUrl);
-    context.save(); context.beginPath(); 
-    context.arc(140, 140, 82, 0, Math.PI * 2); 
-    context.clip(); context.drawImage(avatar, 58, 58, 164, 164); 
+    let normalizedAvatarUrl = avatarUrl;
+    if (normalizedAvatarUrl.endsWith('.webp')) normalizedAvatarUrl = normalizedAvatarUrl.replace('.webp', '.png');
+    context.save(); context.beginPath();
+    context.arc(140, 140, 82, 0, Math.PI * 2);
+    context.clip();
+    try {
+        const avatar = await loadImage(normalizedAvatarUrl);
+        context.drawImage(avatar, 58, 58, 164, 164);
+    } catch {
+        context.fillStyle = '#3a3f4b';
+        context.fillRect(58, 58, 164, 164);
+    }
     context.restore();
-    context.fillStyle = '#ffffff'; 
-    context.font = 'bold 34px sans-serif'; 
+    context.fillStyle = '#ffffff';
+    context.font = `bold 34px "${lobsterFontFamily}"`;
     context.fillText(username, 270, 75);
-    context.font = '24px sans-serif'; 
-    context.fillStyle = '#b8c0cc'; 
-    context.fillText(`Level ${progress.level}  •  ${totalXp.toLocaleString()} total XP`, 270, 115); 
+    context.font = `24px "${alfaFontFamily}"`;
+    context.fillStyle = '#b8c0cc';
+    context.fillText(`Level ${progress.level}  •  ${totalXp.toLocaleString()} total XP`, 270, 115);
     context.fillText(`${progress.xpIntoLevel.toLocaleString()} / ${progress.xpForNextLevel.toLocaleString()} XP to next level`, 270, 155);
-    const barX = 270; const barY = 190; 
-    const barWidth = 650; 
+    const barX = 270; const barY = 190;
+    const barWidth = 650;
     const ratio = Math.min(1, progress.xpIntoLevel / progress.xpForNextLevel);
-    context.fillStyle = '#11151b'; 
-    context.roundRect(barX, barY, barWidth, 28, 14); 
-    context.fill(); context.fillStyle = '#57f287'; 
-    context.roundRect(barX, barY, Math.max(28, barWidth * ratio), 28, 14); 
+    context.fillStyle = '#11151b';
+    context.roundRect(barX, barY, barWidth, 28, 14);
+    context.fill(); context.fillStyle = '#57f287';
+    context.roundRect(barX, barY, Math.max(28, barWidth * ratio), 28, 14);
     context.fill();
     return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: `level-card-${username}.png` });
 }
