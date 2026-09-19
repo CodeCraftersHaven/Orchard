@@ -32,18 +32,19 @@ export default eventModule({
                 })
             ).entries.first()!;
             const { executor, target, targetId } = botAdd;
-            return await mod.send({
+            await mod.send({
                 embeds: [
                     {
                         author: {
                             name: target?.username!,
                             url: `https://discord.com/users/${targetId}`,
-                            icon_url: target?.defaultAvatarURL!
+                            icon_url: target?.displayAvatarURL()!
                         },
-                        description: `A new bot has been invited to the guild by ${executor?.username}. Please add roles manually as desired.`
+                        description: `A new bot has been invited to the guild by <@${executor?.id}>. \nPlease add roles manually as desired.`
                     }
                 ]
             });
+            return;
         }
 
         let embeds = [
