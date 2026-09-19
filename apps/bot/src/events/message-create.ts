@@ -144,8 +144,10 @@ export default eventModule({
                     });
                     const previousLevel = levelFromTotalXp(levelUser.xp - xpToAdd).level;
                     const currentLevel = levelFromTotalXp(levelUser.xp).level;
+                    const channel = levelSettings.channel ?? message.channel.id;
+
                     if (currentLevel > previousLevel && message.channel.isTextBased()) {
-                        await (message.channel as TextChannel).send(`🎉 ${message.member ?? message.author}, you leveled up to **level ${currentLevel}**!`);
+                        await (message.guild.channels.cache.get(channel) as TextChannel)?.send(`🎉 ${message.member ?? message.author}, you leveled up to **level ${currentLevel}**!`);
                     }
                 }
             }

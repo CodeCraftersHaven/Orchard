@@ -158,6 +158,7 @@ export interface GuildSettings {
     leaveEnabled: boolean;
     introC: string;
     levelEnabled: boolean;
+    levelChannel?: string;
     levelFirstReward: number;
     levelSecondReward: number;
     levelThirdReward: number;

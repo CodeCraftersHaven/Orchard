@@ -111,6 +111,7 @@ const systemDefinitions: Record<SetupSystem, SystemDefinition> = {
     leveling: {
         enable: async (prisma, guildId) => { await prisma.levelSettings.upsert({ where: { gID: guildId }, update: { enabled: true }, create: { gID: guildId, enabled: true } }); },
         disable: async (prisma, guildId) => { await prisma.levelSettings.deleteMany({ where: { gID: guildId } }); },
+        setChannel: async (prisma, guildId, channelId) => { await prisma.levelSettings.upsert({ where: { gID: guildId }, update: { channel: channelId }, create: { gID: guildId, channel: channelId, enabled: true } }); },
     },
     'reaction-roles': {
         enable: async () => { },
@@ -330,10 +331,12 @@ async function createVerificationPanel(interaction: ButtonInteraction, prisma: P
     if (!(channel instanceof BaseGuildTextChannel)) return interaction.reply({ content: 'Choose a verification channel first.', flags: MessageFlags.Ephemeral });
     if (!settings?.verifiedRole || !settings.nonVerifiedRoleId) return interaction.reply({ content: 'Choose both verified and non-verified roles first.', flags: MessageFlags.Ephemeral });
     if (panel?.messageId) return interaction.reply({ content: `The verification panel is already posted in <#${panel.channelId}>.`, flags: MessageFlags.Ephemeral });
-    const message = await channel.send({ embeds: [new EmbedBuilder()
-        .setTitle('Member verification')
-        .setDescription('React with any emoji to verify and unlock the server.')
-        .setColor(0x57f287)] });
+    const message = await channel.send({
+        embeds: [new EmbedBuilder()
+            .setTitle('Member verification')
+            .setDescription('React with any emoji to verify and unlock the server.')
+            .setColor(0x57f287)]
+    });
     await message.react('✅');
     await prisma.$transaction([
         prisma.guild.update({ where: { gID: guild.id }, data: { reactionMessageId: message.id } }),
@@ -442,7 +445,8 @@ Non-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}
         const settings = await prisma.levelSettings.upsert({ where: { gID: guildId }, update: {}, create: { gID: guildId } });
         const { currencyName } = await economyLabels(prisma, guildId);
         return container
-            .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Leveling\nWeekly XP leaderboard is **${settings.enabled ? 'enabled' : 'disabled'}**.\n\n🥇 ${settings.firstReward} XP\n🥈 ${settings.secondReward} XP\n🥉 ${settings.thirdReward} XP\nTop 10 participation: ${settings.participantReward} ${currencyName}`))
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Leveling\nWeekly XP leaderboard is **${settings.enabled ? 'enabled' : 'disabled'}**.\nLevel UpChannel: **${settings.channel ? `<#${settings.channel}>` : 'Not configured'}**\n\n🥇 ${settings.firstReward} XP\n🥈 ${settings.secondReward} XP\n🥉 ${settings.thirdReward} XP\nTop 10 participation: ${settings.participantReward} ${currencyName}`))
+            .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-leveling-channel').setPlaceholder('Choose level up channel').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(settings.channel ? [settings.channel] : [])))
             .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-leveling-rewards').setLabel('Edit weekly rewards').setStyle(ButtonStyle.Primary)))
             .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-enable/leveling').setLabel(settings.enabled ? 'Enabled' : 'Enable leveling').setStyle(settings.enabled ? ButtonStyle.Secondary : ButtonStyle.Success)))
             .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-disable/leveling').setLabel('Disable and remove leveling').setStyle(ButtonStyle.Danger)))
@@ -564,7 +568,7 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
     }
     if (interaction.isStringSelectMenu() && interaction.customId === 'setup-system') {
         const system = interaction.values[0] as SetupSystem;
-        if (isSetupSystem(interaction.values[0])) await interaction.update({ components: [await buildSetupContainer(interaction.values[0], interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
+        if (isSetupSystem(system)) await interaction.update({ components: [await buildSetupContainer(system, interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
         return;
     }
     if (interaction.isStringSelectMenu() && interaction.customId === 'setup-welcome-mode') {
@@ -610,6 +614,11 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
         const field = { all: 'allCountChan', users: 'userCountChan', bots: 'botCountChan' }[interaction.customId.split('/')[1]] as 'allCountChan' | 'userCountChan' | 'botCountChan' | undefined;
         if (!field) return;
         return configureStatsChannel(interaction, deps.prisma, field);
+    }
+    if (interaction.isChannelSelectMenu() && interaction.customId === 'setup-leveling-channel') {
+        const channelId = interaction.values[0];
+        await deps.prisma.levelSettings.upsert({ where: { gID: interaction.guildId! }, update: { channel: channelId }, create: { gID: interaction.guildId!, channel: channelId, enabled: true } });
+        return interaction.update({ components: [await buildSetupContainer('leveling', interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
     }
     if (interaction.isRoleSelectMenu() && interaction.customId === 'setup-reaction-roles') {
         return createReactionPanelFromRoles(interaction, deps.prisma);

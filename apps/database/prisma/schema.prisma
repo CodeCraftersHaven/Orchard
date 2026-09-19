@@ -85,32 +85,32 @@ model EconomyItemDefinition {
 }
 
 model EconomyFarmPlot {
-    id        String   @id
-    userId    String
-    serverId  String
-    seed      String
-    crop      String
-    plantedAt DateTime @default(now())
-    readyAt   DateTime
-    notificationChannelId String @default("")
-    notificationMessageId String @default("")
-    completionNotifiedAt DateTime?
+    id                    String    @id
+    userId                String
+    serverId              String
+    seed                  String
+    crop                  String
+    plantedAt             DateTime  @default(now())
+    readyAt               DateTime
+    notificationChannelId String    @default("")
+    notificationMessageId String    @default("")
+    completionNotifiedAt  DateTime?
 
     @@unique([userId, serverId])
 }
 
 model EconomyCraftJob {
-    id        String   @id
-    userId    String
-    serverId  String
-    recipe    String
-    output    String
-    quantity  Int      @default(1)
-    startedAt DateTime @default(now())
-    readyAt   DateTime
-    notificationChannelId String @default("")
-    notificationMessageId String @default("")
-    completionNotifiedAt DateTime?
+    id                    String    @id
+    userId                String
+    serverId              String
+    recipe                String
+    output                String
+    quantity              Int       @default(1)
+    startedAt             DateTime  @default(now())
+    readyAt               DateTime
+    notificationChannelId String    @default("")
+    notificationMessageId String    @default("")
+    completionNotifiedAt  DateTime?
 
     @@unique([userId, serverId])
 }
@@ -230,15 +230,15 @@ model BirthdaySubscription {
 
 // Counting System
 model Counter {
-    gID          String         @id @unique
-    channel      String
-    active       Boolean        @default(false)
-    count        Int
-    lastUser     String?
-    lastCount    Int?
-    highestCount Int
-    recordPending Boolean      @default(false)
-    users        CountingUser[]
+    gID           String         @id @unique
+    channel       String
+    active        Boolean        @default(false)
+    count         Int
+    lastUser      String?
+    lastCount     Int?
+    highestCount  Int
+    recordPending Boolean        @default(false)
+    users         CountingUser[]
 }
 
 model CountingUser {
@@ -250,22 +250,22 @@ model CountingUser {
 
 // Welcome System
 model WelcomeSettings {
-    gID            String  @id @unique
-    enabled        Boolean @default(false)
-    channelId      String  @default("")
-    backgroundUrl  String  @default("")
-    avatarPosition String  @default("middle")
-    mode           String  @default("image")
-    embedTitle     String  @default("")
-    embedDescription String @default("")
-    embedColor     String  @default("#5865F2")
-    embedAuthor    String  @default("")
-    embedTimestamp Boolean @default(false)
-    embedFields    String  @default("[]")
-    containerExtraText String @default("")
-    containerImageUrl String @default("")
-    containerGalleryUrls String @default("")
-    containerSeparators Boolean @default(true)
+    gID                  String  @id @unique
+    enabled              Boolean @default(false)
+    channelId            String  @default("")
+    backgroundUrl        String  @default("")
+    avatarPosition       String  @default("middle")
+    mode                 String  @default("image")
+    embedTitle           String  @default("")
+    embedDescription     String  @default("")
+    embedColor           String  @default("#5865F2")
+    embedAuthor          String  @default("")
+    embedTimestamp       Boolean @default(false)
+    embedFields          String  @default("[]")
+    containerExtraText   String  @default("")
+    containerImageUrl    String  @default("")
+    containerGalleryUrls String  @default("")
+    containerSeparators  Boolean @default(true)
 }
 
 model CustomWelcomeMessages {
@@ -288,13 +288,14 @@ model TaskMessages {
 
 // Leveling System
 model LevelSettings {
-    gID             String  @id @unique
-    enabled         Boolean @default(false)
-    firstReward     Int     @default(1200)
-    secondReward    Int     @default(900)
-    thirdReward     Int     @default(700)
-    participantReward Int   @default(100)
-    weeklyKey       String  @default("")
+    gID               String  @id @unique
+    enabled           Boolean @default(false)
+    channel           String?
+    firstReward       Int     @default(1200)
+    secondReward      Int     @default(900)
+    thirdReward       Int     @default(700)
+    participantReward Int     @default(100)
+    weeklyKey         String  @default("")
 }
 
 model LevelUser {
@@ -308,12 +309,12 @@ model LevelUser {
 }
 
 model LevelWeeklyReward {
-    id       String   @id
-    serverId String
-    weekKey  String
-    userId   String
-    place    Int
-    amount   Int
+    id        String   @id
+    serverId  String
+    weekKey   String
+    userId    String
+    place     Int
+    amount    Int
     createdAt DateTime @default(now())
 
     @@unique([serverId, weekKey, userId])

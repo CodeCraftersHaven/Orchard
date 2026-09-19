@@ -36,6 +36,7 @@ const channelFields: Array<{ key: keyof GuildSettings; label: string; descriptio
     { key: "gamingChannelId", label: "Gaming", description: "Channel used for gaming features." },
     { key: "modC", label: "Moderation", description: "Channel used for moderation activity." },
     { key: "countingChannel", label: "Counting channel", description: "Where members maintain the community count." },
+    { key: "levelChannel", label: "Level up notifications", description: "Where level up announcements are sent. Leave unset to post in the channel the member leveled up in." },
 ];
 
 const systemGroups = {
@@ -67,7 +68,7 @@ const systemGroups = {
     leveling: {
         label: "Leveling",
         description: "Award XP for chatting and let members climb the server leaderboard.",
-        fields: [] as Array<keyof GuildSettings>,
+        fields: ["levelChannel"] as Array<keyof GuildSettings>,
     },
     economy: {
         label: "Economy",

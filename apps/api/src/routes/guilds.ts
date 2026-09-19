@@ -28,6 +28,7 @@ const channelFieldLabels: Record<string, string> = {
   modC: "Moderation",
   countingChannel: "Counting channel",
   rolesChannelId: "Roles",
+  levelChannel: "Level up notifications",
 };
 
 export default async function guildRoutes(fastify: FastifyInstance) {
@@ -132,6 +133,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
             leaveC: guild?.leaveChannelId ?? "",
             leaveEnabled: guild?.leaveEnabled ?? false,
             levelEnabled: levelSettings?.enabled ?? false,
+            levelChannel: levelSettings?.channel ?? "",
             levelFirstReward: levelSettings?.firstReward ?? 1200,
             levelSecondReward: levelSettings?.secondReward ?? 900,
             levelThirdReward: levelSettings?.thirdReward ?? 700,
@@ -204,7 +206,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
         "announcementsChannelId", "rolesChannelId", "modC", "birthdayAnnounceChan",
         "birthdayEnabled",
         "countingChannel", "countingEnabled",
-        "levelEnabled", "levelFirstReward", "levelSecondReward", "levelThirdReward", "levelParticipantReward",
+        "levelEnabled", "levelChannel", "levelFirstReward", "levelSecondReward", "levelThirdReward", "levelParticipantReward",
         "birthdayLogChannelId", "gamingChannelId", "taskLogsChannelId", "verifiedRole",
         "reactionMessageID", "welcomeC", "welcomeAvatarPosition", "welcomeBackgroundUrl", "welcomeMode", "welcomeEmbedTitle", "welcomeEmbedDescription", "welcomeEmbedColor", "welcomeEmbedAuthor", "welcomeEmbedTimestamp", "welcomeEmbedFields", "welcomeContainerExtraText", "welcomeContainerImageUrl", "welcomeContainerGalleryUrls", "welcomeContainerSeparators", "leaveC", "introC",
         "botWelcomeMessage", "botWelcomeMultiple",
@@ -222,11 +224,12 @@ export default async function guildRoutes(fastify: FastifyInstance) {
           return reply.code(409).send({ error: "The bot is not in this server." });
         }
 
-        const [previousGuild, previousCounter, previousBirthday, previousWelcome] = await Promise.all([
+        const [previousGuild, previousCounter, previousBirthday, previousWelcome, previousLevelSettings] = await Promise.all([
           fastify.prisma.guild.findUnique({ where: { gID: guildId } }),
           fastify.prisma.counter.findUnique({ where: { gID: guildId } }),
           fastify.prisma.birthday.findUnique({ where: { gID: guildId }, include: { settings: true } }),
           fastify.prisma.welcomeSettings.findUnique({ where: { gID: guildId } }),
+          fastify.prisma.levelSettings.findUnique({ where: { gID: guildId } }),
         ]);
         const previousChannelValues: Record<string, string> = {
           welcomeC: previousWelcome?.channelId ?? "",
@@ -240,6 +243,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
           modC: previousGuild?.modC ?? "",
           countingChannel: previousCounter?.channel ?? "",
           rolesChannelId: previousGuild?.rolesChannelId ?? "",
+          levelChannel: previousLevelSettings?.channel ?? "",
         };
 
         const data = Object.fromEntries(
@@ -274,8 +278,9 @@ export default async function guildRoutes(fastify: FastifyInstance) {
         const countingData: { channel?: string; active?: boolean } = {};
         if (typeof data.countingChannel === "string") countingData.channel = data.countingChannel;
         if (typeof request.body?.countingEnabled === "boolean") countingData.active = request.body.countingEnabled;
-        const levelData: { enabled?: boolean; firstReward?: number; secondReward?: number; thirdReward?: number; participantReward?: number } = {};
+        const levelData: { enabled?: boolean; channel?: string; firstReward?: number; secondReward?: number; thirdReward?: number; participantReward?: number } = {};
         if (typeof request.body?.levelEnabled === "boolean") levelData.enabled = request.body.levelEnabled;
+        if (typeof data.levelChannel === "string") levelData.channel = data.levelChannel;
         if (typeof request.body?.levelFirstReward === "number") levelData.firstReward = Math.max(0, request.body.levelFirstReward);
         if (typeof request.body?.levelSecondReward === "number") levelData.secondReward = Math.max(0, request.body.levelSecondReward);
         if (typeof request.body?.levelThirdReward === "number") levelData.thirdReward = Math.max(0, request.body.levelThirdReward);
@@ -353,7 +358,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
           Object.entries(data).filter(([field]) => ![
             "birthdayAnnounceChan", "birthdayLogChannelId", "welcomeC", "welcomeAvatarPosition", "welcomeBackgroundUrl", "welcomeMode", "welcomeEmbedTitle", "welcomeEmbedDescription", "welcomeEmbedColor", "welcomeEmbedAuthor", "welcomeEmbedTimestamp", "welcomeEmbedFields", "welcomeContainerExtraText", "welcomeContainerImageUrl", "welcomeContainerGalleryUrls", "welcomeContainerSeparators", "leaveC",
             "birthdayEnabled", "countingChannel", "countingEnabled",
-            "levelEnabled", "levelFirstReward", "levelSecondReward", "levelThirdReward", "levelParticipantReward",
+            "levelEnabled", "levelChannel", "levelFirstReward", "levelSecondReward", "levelThirdReward", "levelParticipantReward",
             "botWelcomeMessage", "botWelcomeMultiple",
             "economyCurrencyName", "economyBankName", "economyCurrencyImageUrl", "economyBankImageUrl",
             "statsAllChannel", "statsUsersChannel", "statsBotsChannel", "statsCategoryId",
@@ -443,7 +448,7 @@ export default async function guildRoutes(fastify: FastifyInstance) {
           }
         }
 
-        return { guild: { ...guild, ...data, leaveC: guild.leaveChannelId, leaveEnabled: guild.leaveEnabled, ...(birthdaySettings ? { birthdayAnnounceChan: birthdaySettings.announceChannelId, birthdayLogChannelId: birthdaySettings.logChannelId } : {}), ...(counter ? { countingChannel: counter.channel, countingEnabled: counter.active } : {}), ...(serverStats ? { statsAllChannel: serverStats.allCountChan, statsUsersChannel: serverStats.userCountChan, statsBotsChannel: serverStats.botCountChan, statsCategoryId: serverStats.categoryId } : {}), ...(botWelcome ? { botWelcomeMessage: botWelcome.messagesArray.join("; "), botWelcomeMultiple: !botWelcome.singleMessage } : {}), ...(economySettings ? { economyCurrencyName: economySettings.currencyName, economyBankName: economySettings.bankName, economyCurrencyImageUrl: economySettings.currencyImageUrl, economyBankImageUrl: economySettings.bankImageUrl } : {}), ...(welcomeSettings ? { welcomeC: welcomeSettings.channelId, welcomeAvatarPosition: welcomeSettings.avatarPosition, welcomeBackgroundUrl: welcomeSettings.backgroundUrl, welcomeMode: welcomeSettings.mode, welcomeEmbedTitle: welcomeSettings.embedTitle, welcomeEmbedDescription: welcomeSettings.embedDescription, welcomeEmbedColor: welcomeSettings.embedColor } : {}), ...(levelSettingsUpdated ? { levelEnabled: levelSettingsUpdated.enabled } : {}) } };
+        return { guild: { ...guild, ...data, leaveC: guild.leaveChannelId, leaveEnabled: guild.leaveEnabled, ...(birthdaySettings ? { birthdayAnnounceChan: birthdaySettings.announceChannelId, birthdayLogChannelId: birthdaySettings.logChannelId } : {}), ...(counter ? { countingChannel: counter.channel, countingEnabled: counter.active } : {}), ...(serverStats ? { statsAllChannel: serverStats.allCountChan, statsUsersChannel: serverStats.userCountChan, statsBotsChannel: serverStats.botCountChan, statsCategoryId: serverStats.categoryId } : {}), ...(botWelcome ? { botWelcomeMessage: botWelcome.messagesArray.join("; "), botWelcomeMultiple: !botWelcome.singleMessage } : {}), ...(economySettings ? { economyCurrencyName: economySettings.currencyName, economyBankName: economySettings.bankName, economyCurrencyImageUrl: economySettings.currencyImageUrl, economyBankImageUrl: economySettings.bankImageUrl } : {}), ...(welcomeSettings ? { welcomeC: welcomeSettings.channelId, welcomeAvatarPosition: welcomeSettings.avatarPosition, welcomeBackgroundUrl: welcomeSettings.backgroundUrl, welcomeMode: welcomeSettings.mode, welcomeEmbedTitle: welcomeSettings.embedTitle, welcomeEmbedDescription: welcomeSettings.embedDescription, welcomeEmbedColor: welcomeSettings.embedColor } : {}), ...(levelSettingsUpdated ? { levelEnabled: levelSettingsUpdated.enabled, levelChannel: levelSettingsUpdated.channel } : {}) } };
       } catch (err) {
         fastify.log.error(err);
         return reply.code(502).send({ error: "Failed to save guild settings" });
