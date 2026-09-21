@@ -18,8 +18,9 @@ export function Login() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top,_#1a1d29,_#0b0d12)] px-6">
-      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 text-center shadow-2xl backdrop-blur">
+    <div className="flex min-h-screen flex-col bg-[radial-gradient(circle_at_top,_#1a1d29,_#0b0d12)] px-6">
+      <main className="flex flex-1 items-center justify-center">
+        <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-white/5 p-8 text-center shadow-2xl backdrop-blur">
         <div className="mx-auto mb-6 grid h-14 w-14 place-items-center rounded-2xl bg-discord-blurple text-2xl">
           🌳
         </div>
@@ -43,7 +44,8 @@ export function Login() {
           </svg>
           Continue with Discord
         </a>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

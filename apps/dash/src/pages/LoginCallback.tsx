@@ -34,9 +34,11 @@ export function LoginCallback() {
   }
 
   return (
-    <div className="flex h-screen items-center justify-center gap-3 text-slate-300">
-      <Spinner />
-      Signing you in…
+    <div className="flex min-h-screen flex-col bg-discord-dark">
+      <main className="flex flex-1 items-center justify-center gap-3 text-slate-300">
+        <Spinner />
+        Signing you in…
+      </main>
     </div>
   );
 }
