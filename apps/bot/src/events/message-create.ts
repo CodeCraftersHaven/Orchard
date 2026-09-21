@@ -6,6 +6,14 @@ export default eventModule({
     type: EventType.Discord,
     name: Events.MessageCreate,
     execute: async message => {
+        if (
+            message.author.bot ||
+            message.system ||
+            message.channel.type === ChannelType.DM ||
+            !message.guild ||
+            !message.inGuild()
+        )
+            return null;
         const prisma = Service('prisma');
         const msg = message.content.toLowerCase();
         const prefixRegex = new RegExp(`^(<@!?${message.client.user.id}>)\\s*`);
@@ -22,15 +30,6 @@ export default eventModule({
                 }, 10000);
             }
         }
-
-        if (
-            message.author.bot ||
-            message.system ||
-            message.channel.type === ChannelType.DM ||
-            !message.guild ||
-            !message.inGuild()
-        )
-            return null;
 
         const counter = await prisma.counter.findUnique({ where: { gID: message.guild.id } });
         if (counter?.active && counter.channel === message.channel.id) {
@@ -144,10 +143,12 @@ export default eventModule({
                     });
                     const previousLevel = levelFromTotalXp(levelUser.xp - xpToAdd).level;
                     const currentLevel = levelFromTotalXp(levelUser.xp).level;
-                    const channel = levelSettings.channel ?? message.channel.id;
+                    const channelId = levelSettings.channel ?? message.channel.id;
+                    const channel = message.guild.channels.cache.get(channelId);
 
-                    if (currentLevel > previousLevel && message.channel.isTextBased()) {
-                        await (message.guild.channels.cache.get(channel) as TextChannel)?.send(`🎉 ${message.member ?? message.author}, you leveled up to **level ${currentLevel}**!`);
+                    if (!channel) return;
+                    if (currentLevel > previousLevel && channel.isTextBased()) {
+                        await (channel as TextChannel).send(`🎉 ${message.member ?? message.author}, you leveled up to **level ${currentLevel}**!`);
                     }
                 }
             }
