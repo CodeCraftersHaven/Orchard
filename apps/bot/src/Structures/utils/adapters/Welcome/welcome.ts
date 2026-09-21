@@ -119,7 +119,7 @@ export async function welcomeCreate(
   const customWelcome = await Service('prisma').botWelcomeMessages.findUnique({ where: { gID: member.guild.id } });
   const welcomeText =
     option(customWelcome?.messagesArray?.length ? customWelcome.messagesArray : [
-      `👋 Welcome to {guildName}, {member}`,
+      `👋 Welcome to {guild}, {member}`,
       `We hope you find what you're looking for and that you enjoy your stay, {member}.`,
       `{member} is here to kick ass and chew gum, but {member} has run out of gum.`,
       `{member} has just joined. Save your bananas.`,
