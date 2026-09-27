@@ -42,12 +42,14 @@ CMD ["npm", "run", "database:db-push"]
 # --- API Production Stage ---
 FROM node:22-alpine AS api
 WORKDIR /app
+RUN apk add --no-cache cairo pango jpeg giflib librsvg
 COPY --from=builder /app /app
 CMD ["npm", "run", "api:start"]
 
 # --- Bot Production Stage ---
 FROM node:22-alpine AS bot
 WORKDIR /app
+RUN apk add --no-cache cairo pango jpeg giflib librsvg
 COPY --from=builder /app /app
 CMD ["npm", "run", "bot:start"]
 
