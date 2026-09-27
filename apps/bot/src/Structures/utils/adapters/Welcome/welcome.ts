@@ -43,7 +43,7 @@ export async function welcomeCreate(
 
   const guildSettings = await Service('prisma').welcomeSettings.findUnique({
     where: { gID: member.guild.id },
-    select: { avatarPosition: true, backgroundUrl: true, mode: true, embedTitle: true, embedDescription: true, embedColor: true, embedAuthor: true, embedTimestamp: true, embedFields: true, containerExtraText: true, containerImageUrl: true, containerGalleryUrls: true, containerSeparators: true }
+    select: { avatarPosition: true, backgroundUrl: true, mode: true, embedTitle: true, embedDescription: true, embedColor: true, embedAuthor: true, embedTimestamp: true, embedFields: true, embedImageUrl: true, containerExtraText: true, containerImageUrl: true, containerGalleryUrls: true, containerSeparators: true }
   });
   const resolvedAvatarPosition = avatarPosition ?? (
     guildSettings?.avatarPosition === 'left' || guildSettings?.avatarPosition === 'right'
@@ -161,11 +161,16 @@ export async function welcomeCreate(
         ? guildSettings.embedColor as ColorResolvable
         : '#5865F2' as ColorResolvable;
       const embed = new EmbedBuilder()
-        .setTitle(guildSettings?.embedTitle || 'Welcome!')
+        .setAuthor({
+          name: guildSettings?.embedAuthor ? guildSettings.embedAuthor : (member.nickname ?? member.user.username),
+          iconURL: member.user.displayAvatarURL(),
+          url: `https://discord.com/users/${member.user.id}`
+        })
+        .setTitle(guildSettings?.embedTitle || welcomeText)
         .setDescription((guildSettings?.embedDescription || welcomeText) + footer)
         .setColor(embedColor);
-      if (guildSettings?.embedAuthor) embed.setAuthor({ name: guildSettings.embedAuthor });
       if (guildSettings?.embedTimestamp) embed.setTimestamp();
+      if (guildSettings?.embedImageUrl) embed.setImage(guildSettings.embedImageUrl);
       try {
         const fields = JSON.parse(guildSettings?.embedFields || '[]');
         if (Array.isArray(fields)) embed.addFields(fields.filter(field => field?.name && field?.value).map(field => ({ name: String(field.name), value: String(field.value), inline: Boolean(field.inline) })));

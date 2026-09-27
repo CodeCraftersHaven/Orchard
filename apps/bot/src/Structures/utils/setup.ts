@@ -312,7 +312,7 @@ async function postSystemPanel(interaction: ModalSubmitInteraction, system: Setu
         .setTitle(`${systemLabels[system]} enabled`)
         .setDescription(`The ${systemLabels[system]} system has been enabled for <#${channel.id}>.`)
         .setColor(0x57f287);
-    if (note) embed.addFields({ name: `${interaction.user.toString()} note`, value: note });
+    if (note) embed.addFields({ name: `${interaction.user.toString()}**'s** note`, value: note });
     const message = await channel.send({ embeds: [embed] });
     await prisma.systemSetupPanel.upsert({
         where: { gID_system: { gID: interaction.guildId!, system } },

@@ -2,8 +2,10 @@
   "extends": "./packages/config/tsconfig.base.json",
   "compilerOptions": {
     "paths": {
-      "@orchard/config": ["./packages/config/dist/index.js"]
+      "@orchard/config": ["./packages/config/dist/index.js"],
+      "@orchard/canvas": ["./packages/canvas/dist/index.js"]
     }
   },
-  "exclude": ["node_modules", "./dist"]
+  "exclude": ["node_modules", "./dist"],
+  "types": ["node"]
 }

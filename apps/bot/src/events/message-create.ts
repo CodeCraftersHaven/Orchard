@@ -1,4 +1,4 @@
-import { checkEmojis, deleteOnTimeout, env, evaluateCountExpression, failEmojis, levelFromTotalXp, levelingWeekKey, raceCountMessages, randomCountMessage, randomMessage, resetCounter, repeatCountMessages, wrongCountMessages, xpCooldownMs, xpCooldowns, delay } from '#utils';
+import { buildLevelUpCard, checkEmojis, deleteOnTimeout, env, evaluateCountExpression, failEmojis, levelFromTotalXp, levelingWeekKey, raceCountMessages, randomCountMessage, randomMessage, resetCounter, repeatCountMessages, wrongCountMessages, xpCooldownMs, xpCooldowns, delay } from '#utils';
 import { EventType, Service, eventModule } from '@sern/handler';
 import { ChannelType, Events, TextChannel } from 'discord.js';
 
@@ -148,7 +148,16 @@ export default eventModule({
 
                     if (!channel) return;
                     if (currentLevel > previousLevel && channel.isTextBased()) {
-                        await (channel as TextChannel).send(`🎉 ${message.member ?? message.author}, you leveled up to **level ${currentLevel}**!`);
+                        await (channel as TextChannel).send({
+                            content: `🎉 ${message.member ?? message.author}, you leveled up to **level ${currentLevel}**!`,
+                            files: [await buildLevelUpCard({
+                                username: message.author.username,
+                                avatarUrl: message.author.displayAvatarURL({ extension: 'png', size: 256 }),
+                                previousLevel,
+                                newLevel: currentLevel,
+                                userStatus: message.member?.presence?.status ?? 'online',
+                            })],
+                        });
                     }
                 }
             }

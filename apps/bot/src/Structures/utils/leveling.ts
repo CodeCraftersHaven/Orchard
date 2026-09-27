@@ -1,7 +1,8 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { createCanvas } from 'canvas';
 import { AttachmentBuilder } from 'discord.js';
 import type { PrismaClient } from '@orchard/database';
-import { alfaFontFamily, lobsterFontFamily, registerCanvasFonts } from '#utils';
+import { LevelUpBuilder, RankCardBuilder } from '@orchard/canvas';
+import type { UserStatus } from '@orchard/canvas';
 
 export const levelingMedals = ['🥇', '🥈', '🥉'];
 
@@ -40,42 +41,43 @@ export function levelingWeekKey(date = new Date()) {
     return monday.toISOString().slice(0, 10);
 }
 
-export async function buildLevelCard(username: string, avatarUrl: string, totalXp: number) {
-    registerCanvasFonts();
-    const progress = levelFromTotalXp(totalXp);
-    const canvas = createCanvas(1000, 280);
+export async function getUserRank(prisma: PrismaClient, serverId: string, xp: number): Promise<number> {
+    const higherCount = await prisma.levelUser.count({ where: { serverId, xp: { gt: xp } } });
+    return higherCount + 1;
+}
+
+export async function buildRankCard(params: { username: string; avatarUrl: string; totalXp: number; rank: number; userStatus?: UserStatus }) {
+    const progress = levelFromTotalXp(params.totalXp);
+    const canvas = createCanvas(1000, 250);
     const context = canvas.getContext('2d');
-    context.fillStyle = '#20242c';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    let normalizedAvatarUrl = avatarUrl;
-    if (normalizedAvatarUrl.endsWith('.webp')) normalizedAvatarUrl = normalizedAvatarUrl.replace('.webp', '.png');
-    context.save(); context.beginPath();
-    context.arc(140, 140, 82, 0, Math.PI * 2);
-    context.clip();
-    try {
-        const avatar = await loadImage(normalizedAvatarUrl);
-        context.drawImage(avatar, 58, 58, 164, 164);
-    } catch {
-        context.fillStyle = '#3a3f4b';
-        context.fillRect(58, 58, 164, 164);
-    }
-    context.restore();
-    context.fillStyle = '#ffffff';
-    context.font = `bold 34px "${lobsterFontFamily}"`;
-    context.fillText(username, 270, 75);
-    context.font = `24px "${alfaFontFamily}"`;
-    context.fillStyle = '#b8c0cc';
-    context.fillText(`Level ${progress.level}  •  ${totalXp.toLocaleString()} total XP`, 270, 115);
-    context.fillText(`${progress.xpIntoLevel.toLocaleString()} / ${progress.xpForNextLevel.toLocaleString()} XP to next level`, 270, 155);
-    const barX = 270; const barY = 190;
-    const barWidth = 650;
-    const ratio = Math.min(1, progress.xpIntoLevel / progress.xpForNextLevel);
-    context.fillStyle = '#11151b';
-    context.roundRect(barX, barY, barWidth, 28, 14);
-    context.fill(); context.fillStyle = '#57f287';
-    context.roundRect(barX, barY, Math.max(28, barWidth * ratio), 28, 14);
-    context.fill();
-    return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: `level-card-${username}.png` });
+    const card = new RankCardBuilder({
+        nicknameText: { content: params.username },
+        currentLvl: progress.level,
+        currentRank: params.rank,
+        currentXP: progress.xpIntoLevel,
+        requiredXP: progress.xpForNextLevel,
+        userStatus: params.userStatus ?? 'online',
+        avatarImgURL: params.avatarUrl,
+        backgroundColor: { background: '#20242c', bubbles: '#2f3542' },
+        progressBarColor: '#57f287',
+    });
+    await card.draw(context, canvas.width, canvas.height);
+    return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: `rank-${params.username}.png` });
+}
+
+export async function buildLevelUpCard(params: { username: string; avatarUrl: string; previousLevel: number; newLevel: number; userStatus?: UserStatus }) {
+    const canvas = createCanvas(1000, 250);
+    const context = canvas.getContext('2d');
+    const card = new LevelUpBuilder({
+        nicknameText: { content: params.username },
+        previousLvl: params.previousLevel,
+        newLvl: params.newLevel,
+        avatarImgURL: params.avatarUrl,
+        userStatus: params.userStatus ?? 'online',
+        backgroundColor: { background: '#20242c', pattern: 'stars', patternColor: '#57f287' },
+    });
+    await card.draw(context, canvas.width, canvas.height);
+    return new AttachmentBuilder(canvas.toBuffer('image/png'), { name: `level-up-${params.username}.png` });
 }
 
 export async function resetWeeklyLeveling(prisma: PrismaClient, serverId: string) {

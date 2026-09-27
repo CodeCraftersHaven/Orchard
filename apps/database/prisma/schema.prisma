@@ -262,6 +262,7 @@ model WelcomeSettings {
     embedAuthor          String  @default("")
     embedTimestamp       Boolean @default(false)
     embedFields          String  @default("[]")
+    embedImageUrl        String  @default("")
     containerExtraText   String  @default("")
     containerImageUrl    String  @default("")
     containerGalleryUrls String  @default("")
@@ -318,6 +319,26 @@ model LevelWeeklyReward {
     createdAt DateTime @default(now())
 
     @@unique([serverId, weekKey, userId])
+}
+
+//Custom Application System
+model CustomAppSettings {
+    gID                  String      @id @unique
+    enabled              Boolean     @default(false)
+    applicationChannelId String      @default("")
+    threadEnabled        Boolean     @default(false)
+    threadRoleIds        String[]
+    apps                 CustomApp[] @relation("CustomAppSettingsApps")
+}
+
+model CustomApp {
+    id                String            @id @unique
+    gID               String
+    position          String
+    questions         String[]
+    customAppSettings CustomAppSettings @relation("CustomAppSettingsApps", fields: [gID], references: [gID], onDelete: Cascade)
+
+    @@index([gID])
 }
 
 model User {

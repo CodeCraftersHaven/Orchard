@@ -1,0 +1,25 @@
+{
+  "name": "@orchard/canvas",
+  "version": "1.0.0",
+  "description": "👾 Canvas-based card generator for Discord bots — welcome, leave, rank & info cards with full customization",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "rimraf dist && tsc"
+  },
+  "files": [
+    "dist/**/*"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "canvas": "3.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "rimraf": "6.1.3",
+    "typescript": "5.9.3"
+  }
+}
