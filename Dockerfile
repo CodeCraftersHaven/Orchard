@@ -11,6 +11,18 @@ ENV API_BASE_URL=${API_BASE_URL}
 ENV DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
 ENV VITE_API_BASE_URL=${API_BASE_URL}
 
+# Build deps for native modules (e.g. node-canvas via node-gyp)
+RUN apk add --no-cache \
+  python3 \
+  make \
+  g++ \
+  pkgconfig \
+  cairo-dev \
+  pango-dev \
+  jpeg-dev \
+  giflib-dev \
+  librsvg-dev
+
 # Copy root config and all package manifests
 COPY . .
 
