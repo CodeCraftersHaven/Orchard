@@ -26,7 +26,9 @@ RUN apk add --no-cache \
 # Copy root config and all package manifests
 COPY . .
 
-# Install all dependencies
+# Install all dependencies (force native modules like canvas to build from source
+# against the musl/Alpine dev libs above, instead of downloading glibc prebuilds)
+ENV npm_config_build_from_source=true
 RUN npm install --include=dev
 RUN npm install -g serve @sern/cli
 
@@ -42,14 +44,14 @@ CMD ["npm", "run", "database:db-push"]
 # --- API Production Stage ---
 FROM node:22-alpine AS api
 WORKDIR /app
-RUN apk add --no-cache cairo pango jpeg giflib librsvg
+RUN apk add --no-cache cairo pango jpeg giflib librsvg fontconfig ttf-dejavu
 COPY --from=builder /app /app
 CMD ["npm", "run", "api:start"]
 
 # --- Bot Production Stage ---
 FROM node:22-alpine AS bot
 WORKDIR /app
-RUN apk add --no-cache cairo pango jpeg giflib librsvg
+RUN apk add --no-cache cairo pango jpeg giflib librsvg fontconfig ttf-dejavu
 COPY --from=builder /app /app
 CMD ["npm", "run", "bot:start"]
 
