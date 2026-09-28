@@ -13,3 +13,4 @@ export * from './counting.js';
 export * from './economy.js';
 export * from './wallet.js';
 export * from './setup.js';
+export * from './poll.js';
