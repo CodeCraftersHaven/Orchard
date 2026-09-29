@@ -8,6 +8,8 @@ import type {
   Me,
   OrchardStats,
   EconomyItemDefinition,
+  StickyMessage,
+  StickySettingsResponse,
 } from "@orchard/types";
 
 export type {
@@ -112,6 +114,15 @@ export const updateEconomyItem = (guildId: string, itemId: string, item: { game?
   apiFetch<EconomyItemDefinition>(`/guilds/${guildId}/economy/items/${itemId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(item) });
 export const deleteEconomyItem = (guildId: string, itemId: string) =>
   apiFetch<{ deleted: boolean }>(`/guilds/${guildId}/economy/items/${itemId}`, { method: "DELETE" });
+export const getStickySettings = (guildId: string) => apiFetch<StickySettingsResponse>(`/guilds/${guildId}/stickies`);
+export const saveStickySettings = (guildId: string, settings: Pick<StickySettingsResponse, "enabled" | "logsChannelId">) =>
+  apiFetch<Pick<StickySettingsResponse, "enabled" | "logsChannelId">>(`/guilds/${guildId}/stickies/settings`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(settings) });
+export const createStickyMessage = (guildId: string, sticky: Omit<StickyMessage, "id" | "messageId">) =>
+  apiFetch<StickyMessage>(`/guilds/${guildId}/stickies`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sticky) });
+export const updateStickyMessage = (guildId: string, stickyId: string, sticky: Omit<StickyMessage, "id" | "messageId">) =>
+  apiFetch<StickyMessage>(`/guilds/${guildId}/stickies/${stickyId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(sticky) });
+export const deleteStickyMessage = (guildId: string, stickyId: string) =>
+  apiFetch<{ deleted: boolean }>(`/guilds/${guildId}/stickies/${stickyId}`, { method: "DELETE" });
 export const getOrchardStats = () => apiFetch<OrchardStats>("/stats");
 export const getHealth = () => apiFetch<HealthResponse>("/health");
 export const discordLoginUrl = () => `${API_BASE_URL}/auth/discord/login`;

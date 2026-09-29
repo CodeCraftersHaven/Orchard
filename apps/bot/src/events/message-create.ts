@@ -14,6 +14,7 @@ export default eventModule({
             !message.inGuild()
         )
             return null;
+        await Service('sticky').handleMessage(message.guild.id, message.channel.id);
         const prisma = Service('prisma');
         const msg = message.content.toLowerCase();
         const prefixRegex = new RegExp(`^(<@!?${message.client.user.id}>)\\s*`);

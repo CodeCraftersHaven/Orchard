@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import type { EconomyItemDefinition, GuildChannel, GuildRole, GuildSettings, ReactionRolePanel, WelcomeMode } from "@orchard/types";
+import type { EconomyItemDefinition, GuildChannel, GuildRole, GuildSettings, ReactionRolePanel, StickyMessage, StickyMode, WelcomeMode } from "@orchard/types";
 import { Link, useParams } from "react-router-dom";
 import { Navbar } from "../components/Navbar";
 import { Spinner } from "../components/Spinner";
@@ -20,9 +20,15 @@ import {
     createEconomyItem,
     updateEconomyItem,
     deleteEconomyItem,
+    getStickySettings,
+    saveStickySettings,
+    createStickyMessage,
+    updateStickyMessage,
+    deleteStickyMessage,
 } from "../lib/api";
 
 const defaultWelcomeBackgroundUrl = "https://i.imgur.com/RCiKhGl.png";
+const stickyEmbedTitle = "Sticky Message";
 
 const channelFields: Array<{ key: keyof GuildSettings; label: string; description: string }> = [
     { key: "welcomeC", label: "Welcome messages", description: "Where new member welcome messages are sent." },
@@ -75,6 +81,11 @@ const systemGroups = {
         description: "Customize the currency and bank shown by Orchard.",
         fields: [] as Array<keyof GuildSettings>,
     },
+    stickies: {
+        label: "Sticky messages",
+        description: "Keep multiple channel reminders visible as conversations move on.",
+        fields: [] as Array<keyof GuildSettings>,
+    },
     reactionRoles: {
         label: "Reaction roles",
         description: "Create Discord embed menus that grant roles when members react.",
@@ -88,6 +99,7 @@ const systemGroups = {
 } as const;
 
 type SystemKey = keyof typeof systemGroups;
+type StickyDraft = Omit<StickyMessage, "id" | "messageId"> & { id?: string };
 
 function channelOptions(channels: GuildChannel[]) {
     const grouped = new Map<string, GuildChannel[]>();
@@ -166,6 +178,28 @@ function embedFieldsJson(value: string) {
     }).filter((field) => field.name && field.value));
 }
 
+function stickyMessagePreview(sticky: StickyMessage) {
+    const accentColor = /^#[0-9A-Fa-f]{6}$/.test(sticky.color) ? sticky.color : "#5865F2";
+    if (sticky.mode === "Embed") {
+        return <div className="mt-3 max-w-md overflow-hidden rounded border border-[#1e1f22] bg-[#2b2d31] text-sm text-[#dbdee1]">
+            <div className="border-l-4 px-3 py-2.5" style={{ borderLeftColor: accentColor }}>
+                <p className="font-semibold text-white">{stickyEmbedTitle}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-[#b5bac1]">{sticky.description || sticky.content}</p>
+            </div>
+        </div>;
+    }
+    if (sticky.mode === "Container") {
+        return <div className="mt-3 max-w-md overflow-hidden rounded border border-[#1e1f22] bg-[#313338] text-sm text-[#dbdee1]">
+            <div className="border-l-4 px-3 py-2.5" style={{ borderLeftColor: accentColor }}>
+                <p className="font-bold text-white">{stickyEmbedTitle}</p>
+                <div className="my-2 border-t border-white/15" />
+                <p className="whitespace-pre-wrap break-words">{sticky.content}</p>
+            </div>
+        </div>;
+    }
+    return <p className="mt-2 max-w-md whitespace-pre-wrap break-words text-sm text-slate-300">{sticky.content}</p>;
+}
+
 export function GuildManagement() {
     const { guildId, system } = useParams();
     const { user } = useAuth();
@@ -206,6 +240,10 @@ export function GuildManagement() {
     const [statsCreateMissing, setStatsCreateMissing] = useState(false);
     const [statsPlacement, setStatsPlacement] = useState("");
     const [setupNotes, setSetupNotes] = useState<Record<string, string>>({});
+    const [stickySettings, setStickySettings] = useState({ enabled: false, logsChannelId: "" });
+    const [stickyMessages, setStickyMessages] = useState<StickyMessage[]>([]);
+    const [stickyDraft, setStickyDraft] = useState<StickyDraft>({ channelId: "", mode: "Text", content: "", title: "", description: "", color: "#5865F2" });
+    const [stickySaving, setStickySaving] = useState(false);
 
     useEffect(() => {
         if (!guildId) return;
@@ -268,6 +306,17 @@ export function GuildManagement() {
             });
     }, [guildId, activeSystem]);
 
+    useEffect(() => {
+        if (!guildId || activeSystem !== "stickies") return;
+        getStickySettings(guildId)
+            .then((response) => {
+                setStickySettings({ enabled: response.enabled, logsChannelId: response.logsChannelId });
+                setStickyMessages(response.stickies);
+                setStickyDraft((current) => ({ ...current, channelId: current.channelId || channels.find((channel) => channel.type === 0)?.id || "" }));
+            })
+            .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load sticky messages."));
+    }, [guildId, activeSystem, channels]);
+
     const welcomeBackgroundUrl = settings.welcomeBackgroundUrl?.trim() || defaultWelcomeBackgroundUrl;
     const previewBackgroundUrl = backgroundImageFailed ? defaultWelcomeBackgroundUrl : welcomeBackgroundUrl;
     const previewAvatarUrl = user ? avatarUrl(user) : "https://cdn.discordapp.com/embed/avatars/0.png";
@@ -296,6 +345,11 @@ export function GuildManagement() {
         setError(null);
         setNotice(null);
         try {
+            if (activeSystem === "stickies") {
+                await saveStickySettings(guildId, stickySettings);
+                setNotice("Sticky settings saved.");
+                return;
+            }
             await saveGuildSettings(guildId, {
                 ...settings,
                 botWelcomeMessage: botWelcomeMessages.join("; "),
@@ -314,6 +368,40 @@ export function GuildManagement() {
             setError(err instanceof ApiError ? err.message : "Failed to save guild settings.");
         } finally {
             setSaving(false);
+        }
+    };
+
+    const saveStickyDraft = async () => {
+        if (!guildId) return;
+        setStickySaving(true);
+        setError(null);
+        setNotice(null);
+        try {
+            const { id, ...data } = stickyDraft;
+            const payload = { ...data, title: data.mode === "Embed" ? stickyEmbedTitle : "" };
+            const saved = id
+                ? await updateStickyMessage(guildId, id, payload)
+                : await createStickyMessage(guildId, payload);
+            setStickyMessages((current) => id ? current.map((sticky) => sticky.id === id ? saved : sticky) : [...current, saved]);
+            setStickySettings((current) => ({ ...current, enabled: true }));
+            setStickyDraft({ channelId: data.channelId, mode: "Text", content: "", title: "", description: "", color: "#5865F2" });
+            setNotice(id ? "Sticky message updated." : "Sticky message posted.");
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to save sticky message.");
+        } finally {
+            setStickySaving(false);
+        }
+    };
+
+    const removeSticky = async (stickyId: string) => {
+        if (!guildId || !window.confirm("Delete this sticky message?")) return;
+        try {
+            await deleteStickyMessage(guildId, stickyId);
+            setStickyMessages((current) => current.filter((sticky) => sticky.id !== stickyId));
+            if (stickyDraft.id === stickyId) setStickyDraft((current) => ({ ...current, id: undefined }));
+            setNotice("Sticky message deleted.");
+        } catch (err) {
+            setError(err instanceof ApiError ? err.message : "Failed to delete sticky message.");
         }
     };
 
@@ -438,7 +526,7 @@ export function GuildManagement() {
                             ))}
                         </section>}
 
-                        {activeSystem && activeSystem !== "reactionRoles" && <section className="mt-8 grid gap-5 md:grid-cols-2">
+                        {activeSystem && activeSystem !== "reactionRoles" && activeSystem !== "stickies" && <section className="mt-8 grid gap-5 md:grid-cols-2">
                             {channelFields.filter((field) => systemGroups[activeSystem].fields.includes(field.key)).map((field) => (
                                 <label key={field.key} className="rounded-2xl border border-white/10 bg-white/5 p-5">
                                     <span className="block font-semibold text-white">{field.label}</span>
@@ -525,6 +613,55 @@ export function GuildManagement() {
                                         <button type="button" onClick={() => { if (!guildId) return; void deleteEconomyItem(guildId, item.id).then(() => setEconomyItems((current) => current.filter((entry) => entry.id !== item.id))).catch((err) => setError(err instanceof ApiError ? err.message : "Failed to delete economy item.")); }} className="text-xs font-semibold text-red-300 hover:text-red-200">Remove</button>
                                     </div>)}
                                 </div>
+                            </div>
+                        </section>}
+
+                        {activeSystem === "stickies" && <section className="mt-8 space-y-5">
+                            <div className="grid gap-5 md:grid-cols-2">
+                                <label className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                    <span className="block font-semibold text-white">Sticky system</span>
+                                    <span className="mt-1 block text-sm text-slate-400">Enable or pause all sticky messages in this server.</span>
+                                    <span className="mt-4 flex items-center gap-3 text-sm text-slate-200"><input type="checkbox" checked={stickySettings.enabled} onChange={(event) => setStickySettings((current) => ({ ...current, enabled: event.target.checked }))} className="h-5 w-5 accent-discord-green" />Enabled</span>
+                                </label>
+                                <label className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                    <span className="block font-semibold text-white">Log channel</span>
+                                    <span className="mt-1 block text-sm text-slate-400">Startup checks report missing sticky messages here.</span>
+                                    <select value={stickySettings.logsChannelId} onChange={(event) => setStickySettings((current) => ({ ...current, logsChannelId: event.target.value }))} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
+                                        <option value="">Choose a channel</option>
+                                        {channels.filter((channel) => channel.type === 0).map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+                                    </select>
+                                </label>
+                            </div>
+
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                    <div><h2 className="font-semibold text-white">{stickyDraft.id ? "Edit sticky message" : "Create sticky message"}</h2><p className="mt-1 text-sm text-slate-400">The sticky is reposted after every five member messages in its channel.</p></div>
+                                    {stickyDraft.id && <button type="button" onClick={() => setStickyDraft({ channelId: stickyDraft.channelId, mode: "Text", content: "", title: "", description: "", color: "#5865F2" })} className="text-sm text-slate-300 hover:text-white">Cancel edit</button>}
+                                </div>
+                                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                                    <label className="text-sm text-slate-300">Channel<select value={stickyDraft.channelId} onChange={(event) => setStickyDraft((current) => ({ ...current, channelId: event.target.value }))} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white"><option value="">Choose a channel</option>{channels.filter((channel) => channel.type === 0).map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}</select></label>
+                                    <label className="text-sm text-slate-300">Format<select value={stickyDraft.mode} onChange={(event) => setStickyDraft((current) => ({ ...current, mode: event.target.value as StickyMode }))} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white"><option value="Text">Regular message</option><option value="Embed">Embed</option><option value="Container">Container</option></select></label>
+                                </div>
+                                {stickyDraft.mode === "Text" && <label className="mt-3 block text-sm text-slate-300">Message<textarea value={stickyDraft.content} onChange={(event) => setStickyDraft((current) => ({ ...current, content: event.target.value }))} maxLength={2000} rows={3} placeholder="Write the message to keep visible" className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white" /></label>}
+                                {stickyDraft.mode === "Embed" && <div className="mt-3 grid gap-3 sm:grid-cols-[auto_1fr_auto]">
+                                    <div className="text-sm text-slate-300"><span>Fixed title</span><p className="mt-2 rounded-lg border border-white/10 bg-[#121722] px-3 py-2.5 text-white">{stickyEmbedTitle}</p></div>
+                                    <label className="text-sm text-slate-300">Description<textarea value={stickyDraft.description} onChange={(event) => setStickyDraft((current) => ({ ...current, description: event.target.value }))} maxLength={4096} rows={2} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white" /></label>
+                                    <label className="text-sm text-slate-300">Color<input type="color" value={stickyDraft.color} onChange={(event) => setStickyDraft((current) => ({ ...current, color: event.target.value }))} className="mt-2 block h-11 w-16 cursor-pointer rounded border border-white/15 bg-[#121722] p-1" /></label>
+                                </div>}
+                                {stickyDraft.mode === "Container" && <div className="mt-3 grid gap-3 sm:grid-cols-[auto_1fr_auto]">
+                                    <div className="text-sm text-slate-300"><span>Fixed title</span><p className="mt-2 rounded-lg border border-white/10 bg-[#121722] px-3 py-2.5 text-white">{stickyEmbedTitle}</p></div>
+                                    <label className="text-sm text-slate-300">Container text<textarea value={stickyDraft.content} onChange={(event) => setStickyDraft((current) => ({ ...current, content: event.target.value }))} maxLength={4000} rows={3} placeholder="Write the message to keep visible" className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white" /></label>
+                                    <label className="text-sm text-slate-300">Accent color<input type="color" value={stickyDraft.color} onChange={(event) => setStickyDraft((current) => ({ ...current, color: event.target.value }))} className="mt-2 block h-11 w-16 cursor-pointer rounded border border-white/15 bg-[#121722] p-1" /></label>
+                                </div>}
+                                <button type="button" onClick={() => void saveStickyDraft()} disabled={stickySaving || !stickyDraft.channelId} className="mt-4 rounded-lg bg-discord-green px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-wait disabled:opacity-60">{stickySaving ? "Posting…" : stickyDraft.id ? "Save sticky" : "Post sticky"}</button>
+                            </div>
+
+                            <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
+                                <h2 className="font-semibold text-white">Configured messages <span className="text-sm font-normal text-slate-400">({stickyMessages.length})</span></h2>
+                                {stickyMessages.length ? <div className="mt-4 divide-y divide-white/10">{stickyMessages.map((sticky) => <div key={sticky.id} className="flex flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0">
+                                    <div className="min-w-0 flex-1"><p className="font-medium text-white">{sticky.mode} in #{channels.find((channel) => channel.id === sticky.channelId)?.name ?? "unknown-channel"}</p>{stickyMessagePreview(sticky)}</div>
+                                    <div className="flex shrink-0 gap-3"><button type="button" onClick={() => setStickyDraft({ id: sticky.id, channelId: sticky.channelId, mode: sticky.mode, content: sticky.content, title: sticky.title, description: sticky.description, color: sticky.color })} className="text-sm font-semibold text-discord-green hover:text-white">Edit</button><button type="button" onClick={() => void removeSticky(sticky.id)} className="text-sm font-semibold text-red-300 hover:text-red-200">Delete</button></div>
+                                </div>)}</div> : <p className="mt-2 text-sm text-slate-400">No sticky messages configured.</p>}
                             </div>
                         </section>}
 

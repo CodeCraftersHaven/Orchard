@@ -115,6 +115,25 @@ export interface EconomyItemDefinition {
     value: number;
 }
 
+export type StickyMode = "Text" | "Embed" | "Container";
+
+export interface StickyMessage {
+    id: string;
+    channelId: string;
+    messageId: string;
+    mode: StickyMode;
+    content: string;
+    title: string;
+    description: string;
+    color: string;
+}
+
+export interface StickySettingsResponse {
+    enabled: boolean;
+    logsChannelId: string;
+    stickies: StickyMessage[];
+}
+
 export type AvatarPosition = "left" | "middle" | "right";
 export type WelcomeMode = "text" | "embed" | "image" | "container";
 

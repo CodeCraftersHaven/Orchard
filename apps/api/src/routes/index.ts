@@ -4,6 +4,7 @@ import guildRoutes from "./guilds.js";
 import statsRoutes from "./stats.js";
 import reactionRoleRoutes from "./reaction-roles.js";
 import economyRoutes from "./economy.js";
+import stickyRoutes from "./sticky.js";
 export default async function router(
     fastify: FastifyInstance,
 ) {
@@ -12,4 +13,5 @@ export default async function router(
     await fastify.register(statsRoutes, { prefix: "/stats" });
     await fastify.register(reactionRoleRoutes, { prefix: "/guilds" });
     await fastify.register(economyRoutes, { prefix: "/guilds" });
+    await fastify.register(stickyRoutes, { prefix: "/guilds" });
 }

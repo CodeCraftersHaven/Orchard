@@ -1,5 +1,6 @@
 export * from './adapters/logger.js';
-export * from '@orchard/database';
+export { Prisma, PrismaClient, prisma } from '@orchard/database';
+export { } from '@orchard/database';
 export * from './utils.js';
 export * from '@orchard/config';
 export * from './adapters/Welcome/welcome.js';
@@ -14,3 +15,4 @@ export * from './economy.js';
 export * from './wallet.js';
 export * from './setup.js';
 export * from './poll.js';
+export * from './sticky.js'

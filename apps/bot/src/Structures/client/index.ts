@@ -1,7 +1,7 @@
 import * as config from './config.js';
 import { Orchard } from '#Orchard';
 import { makeDependencies, Sern } from '@sern/handler';
-import { logger, TaskLogger, prisma } from '#utils';
+import { logger, TaskLogger, prisma, Sticky } from '#utils';
 import { Publisher } from '@sern/publisher';
 
 
@@ -10,6 +10,7 @@ await makeDependencies(({ add, swap }) => {
   swap('@sern/logger', logger);
   add('prisma', prisma);
   add('publisher', deps => new Publisher(deps['@sern/modules'], deps['@sern/emitter'], deps['@sern/logger']));
+  add('sticky', deps => new Sticky(deps))
   add('task-logger', new TaskLogger());
 });
 

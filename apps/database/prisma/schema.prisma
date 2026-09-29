@@ -347,3 +347,32 @@ model User {
     id        String   @id
     username  String
 }
+
+model Sticky {
+    id                    String          @id @default(cuid())
+    channelId             String
+    messageId             String          @default("")
+    mode                  StickyType      @default(Text)
+    content               String          @default("")
+    title                 String          @default("")
+    description           String          @default("")
+    color                 String          @default("#5865F2")
+    stickySettings        StickySettings? @relation(fields: [stickySettingsGuildId], references: [guildId], onDelete: Cascade)
+    stickySettingsGuildId String?
+
+    @@unique([stickySettingsGuildId, channelId])
+}
+
+model StickySettings {
+    guildId       String     @id
+    enabled       Boolean    @default(false)
+    logsChannelId String     @default("")
+    mode          StickyType @default(Embed)
+    stickies      Sticky[]
+}
+
+enum StickyType {
+    Text
+    Embed
+    Container
+}

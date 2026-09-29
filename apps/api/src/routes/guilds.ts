@@ -14,6 +14,7 @@ import {
   guildIconUrl,
   createBotEmbedMessage,
   addBotReaction,
+  deleteBotMessage,
 } from "../lib/discord.js";
 
 const channelFieldLabels: Record<string, string> = {
@@ -466,6 +467,12 @@ export default async function guildRoutes(fastify: FastifyInstance) {
         const userGuild = userGuilds.find((guild) => guild.id === guildId);
         if (!userGuild || !hasAdministratorPermission(userGuild)) return reply.code(403).send({ error: "Administrator permissions are required." });
         if (!(await getBotGuildIds()).has(guildId)) return reply.code(409).send({ error: "The bot is not in this server." });
+
+        if (system === "stickies") {
+          const settings = await fastify.prisma.stickySettings.findUnique({ where: { guildId }, include: { stickies: true } });
+          await Promise.all(settings?.stickies.map(sticky => deleteBotMessage(sticky.channelId, sticky.messageId).catch(() => undefined)) ?? []);
+          await fastify.prisma.stickySettings.deleteMany({ where: { guildId } });
+        }
 
         await fastify.prisma.$transaction(async (transaction) => {
           await transaction.systemSetupPanel.deleteMany({ where: { gID: guildId, system } });

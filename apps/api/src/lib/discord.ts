@@ -158,6 +158,50 @@ export async function createBotEmbedMessage(channelId: string, title: string, de
   });
 }
 
+type BotStickyMessage = {
+  mode: "Text" | "Embed" | "Container";
+  content: string;
+  title: string;
+  description: string;
+  color: string;
+};
+
+function botStickyPayload(sticky: BotStickyMessage) {
+  const color = /^#[0-9A-Fa-f]{6}$/.test(sticky.color) ? Number.parseInt(sticky.color.slice(1), 16) : 0x5865f2;
+  if (sticky.mode === "Embed") {
+    return { embeds: [{ ...(sticky.title ? { title: sticky.title } : {}), description: sticky.description || sticky.content, color }] };
+  }
+  if (sticky.mode === "Container") {
+    return {
+      flags: 1 << 15,
+      components: [{
+        type: 17, accent_color: color, components: [
+          { type: 10, content: `**${sticky.title || "Sticky Message"}**` },
+          { type: 14 },
+          { type: 10, content: sticky.content },
+        ]
+      }],
+    };
+  }
+  return { content: sticky.content };
+}
+
+export function createBotStickyMessage(channelId: string, sticky: BotStickyMessage) {
+  return discordFetch<{ id: string }>(`/channels/${channelId}/messages`, env.DISCORD_TOKEN, "Bot", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(botStickyPayload(sticky)),
+  });
+}
+
+export function updateBotStickyMessage(channelId: string, messageId: string, sticky: BotStickyMessage) {
+  return discordFetch<{ id: string }>(`/channels/${channelId}/messages/${messageId}`, env.DISCORD_TOKEN, "Bot", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(botStickyPayload(sticky)),
+  });
+}
+
 export async function addBotReaction(channelId: string, messageId: string, emoji: string) {
   const encodedEmoji = encodeURIComponent(emoji);
   await discordFetch<unknown>(`/channels/${channelId}/messages/${messageId}/reactions/${encodedEmoji}/@me`, env.DISCORD_TOKEN, "Bot", {

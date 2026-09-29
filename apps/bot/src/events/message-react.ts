@@ -84,9 +84,8 @@ export default eventModule({
                             });
                         }, 10 * 1000);
                     });
-                const welcomeChannel = mmm.guild.systemChannel
-                    ?? (welcomeSettings?.channelId ? await mmm.guild.channels.fetch(welcomeSettings.channelId).catch(() => null) : null);
-                await welcomeCreate(mmm, mmm.guild.name, counts.users, welcomeChannel instanceof TextChannel ? welcomeChannel : null, {
+                const welcomeChannel: TextChannel = welcomeSettings?.channelId ? await mmm.guild.channels.fetch(welcomeSettings.channelId).catch(() => null) as TextChannel : mmm.guild.systemChannel as TextChannel;
+                await welcomeCreate(mmm, mmm.guild.name, counts.users, welcomeChannel, {
                     intro: Guild.introC,
                     roles: Guild.rolesChannelId
                 }).then(async () => {
