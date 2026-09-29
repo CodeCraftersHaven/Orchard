@@ -11,6 +11,17 @@ export type StickyContent = {
     color: string;
 };
 
+export const stickyColors = [
+    { name: 'Blurple', value: '#5865F2' },
+    { name: 'Green', value: '#57F287' },
+    { name: 'Yellow', value: '#FEE75C' },
+    { name: 'Red', value: '#ED4245' },
+    { name: 'Fuchsia', value: '#EB459E' },
+    { name: 'Orange', value: '#E67E22' },
+    { name: 'Teal', value: '#1ABC9C' },
+    { name: 'White', value: '#FFFFFF' },
+];
+
 function isUniqueConstraintError(error: unknown) {
     return typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
 }

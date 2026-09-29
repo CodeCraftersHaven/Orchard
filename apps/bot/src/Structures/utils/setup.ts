@@ -1,5 +1,6 @@
 import type { PrismaClient } from '#utils';
 import { channelUpdater, defaultWelcomeBackgroundUrl, economyLabels } from '#utils';
+import { Sticky, stickyColors, type StickyContent } from './sticky.js';
 import {
     ActionRowBuilder,
     BaseGuildTextChannel,
@@ -27,11 +28,44 @@ import {
     type StringSelectMenuInteraction,
 } from 'discord.js';
 
-export type SetupSystem = 'welcome' | 'birthdays' | 'counting' | 'server-stats' | 'leveling' | 'reaction-roles' | 'verification' | 'economy';
+export type SetupSystem = 'welcome' | 'birthdays' | 'community' | 'counting' | 'server-stats' | 'leveling' | 'reaction-roles' | 'verification' | 'economy' | 'stickies';
 type SetupInteraction = ButtonInteraction | ChannelSelectMenuInteraction | ModalSubmitInteraction | RoleSelectMenuInteraction | StringSelectMenuInteraction;
 const positions = ['left', 'middle', 'right'] as const;
 
-type SetupDeps = { prisma: PrismaClient };
+type StickySetupDraft = StickyContent & { stickyId?: string };
+type SetupDeps = { prisma: PrismaClient; sticky: Sticky };
+const stickySetupDrafts = new Map<string, StickySetupDraft>();
+
+function stickyDraftKey(guildId: string, userId: string) {
+    return `${guildId}:${userId}`;
+}
+
+function newStickyDraft(): StickySetupDraft {
+    return { channelId: '', mode: 'Text', content: '', title: '', description: '', color: '#5865F2' };
+}
+
+const textChannelTypes = [ChannelType.GuildText, ChannelType.GuildAnnouncement] as const;
+const introChannelTypes = [
+    ChannelType.GuildText,
+    ChannelType.GuildVoice,
+    ChannelType.GuildAnnouncement,
+    ChannelType.AnnouncementThread,
+    ChannelType.PublicThread,
+    ChannelType.PrivateThread,
+    ChannelType.GuildStageVoice,
+    ChannelType.GuildForum,
+    ChannelType.GuildMedia,
+] as const;
+
+function stickyDraftFor(guildId: string, userId: string) {
+    const key = stickyDraftKey(guildId, userId);
+    let draft = stickySetupDrafts.get(key);
+    if (!draft) {
+        draft = newStickyDraft();
+        stickySetupDrafts.set(key, draft);
+    }
+    return draft;
+}
 
 function isAdministrator(interaction: SetupInteraction) {
     return interaction.inGuild() && (interaction.member?.permissions as PermissionsBitField).has(PermissionFlagsBits.Administrator);
@@ -42,12 +76,14 @@ function systemSelector(selected?: SetupSystem) {
         new StringSelectMenuBuilder().setCustomId('setup-system').setPlaceholder('Choose a system to manage').addOptions([
             { label: 'Welcome messages', value: 'welcome', description: 'Configure welcome images and messages.', default: selected === 'welcome' },
             { label: 'Birthday messages', value: 'birthdays', description: 'Enable or disable birthday announcements.', default: selected === 'birthdays' },
+            { label: 'Community channels', value: 'community', description: 'Configure shared community channel assignments.', default: selected === 'community' },
             { label: 'Counting', value: 'counting', description: 'Configure the counting channel and state.', default: selected === 'counting' },
             { label: 'Server stats', value: 'server-stats', description: 'Configure visible voice-channel member statistics.', default: selected === 'server-stats' },
             { label: 'Leveling', value: 'leveling', description: 'Configure weekly XP rewards.', default: selected === 'leveling' },
             { label: 'Reaction roles', value: 'reaction-roles', description: 'Manage reaction-role panels.', default: selected === 'reaction-roles' },
             { label: 'Verification', value: 'verification', description: 'Create a reaction-based member verification panel.', default: selected === 'verification' },
             { label: 'Economy', value: 'economy', description: 'Customize currency and bank settings.', default: selected === 'economy' },
+            { label: 'Sticky messages', value: 'stickies', description: 'Create and manage per-channel sticky messages.', default: selected === 'stickies' },
         ])
     );
 }
@@ -61,12 +97,14 @@ function overviewButton() {
 const systemLabels: Record<SetupSystem, string> = {
     welcome: 'Welcome messages',
     birthdays: 'Birthday messages',
+    community: 'Community channels',
     counting: 'Counting',
     'server-stats': 'Server stats',
     leveling: 'Leveling',
     'reaction-roles': 'Reaction roles',
     verification: 'Verification',
     economy: 'Economy',
+    stickies: 'Sticky messages',
 };
 
 type SystemDefinition = {
@@ -92,6 +130,12 @@ const systemDefinitions: Record<SetupSystem, SystemDefinition> = {
                     await transaction.birthdaySettings.delete({ where: { gID: birthday.settingsId } });
                 }
             });
+        },
+    },
+    community: {
+        enable: async () => { },
+        disable: async (prisma, guildId) => {
+            await prisma.guild.updateMany({ where: { gID: guildId }, data: { introC: '', announcementsChannelId: '', taskLogsChannelId: '', gamingChannelId: '', modC: '', leaveChannelId: '', leaveEnabled: false } });
         },
     },
     counting: {
@@ -137,6 +181,12 @@ const systemDefinitions: Record<SetupSystem, SystemDefinition> = {
             ]);
         },
     },
+    stickies: {
+        enable: async (prisma, guildId) => {
+            await prisma.stickySettings.upsert({ where: { guildId }, update: { enabled: true }, create: { guildId, enabled: true } });
+        },
+        disable: async (prisma, guildId) => { await prisma.stickySettings.deleteMany({ where: { guildId } }); },
+    },
 };
 
 function isSetupSystem(value: string): value is SetupSystem {
@@ -175,6 +225,17 @@ function economyModal() {
         field('bank-name', 'Bank name', 'Bank'),
         field('currency-image', 'Currency image URL', 'https://example.com/currency.png'),
         field('bank-image', 'Bank image URL', 'https://example.com/bank.png'),
+    );
+}
+
+function stickyContentModal(draft: StickySetupDraft) {
+    const isEmbed = draft.mode === 'Embed';
+    const label = isEmbed ? 'Embed description' : draft.mode === 'Container' ? 'Container text' : 'Message text';
+    const content = isEmbed ? draft.description : draft.content;
+    return new ModalBuilder().setCustomId('setup-sticky-content-submit').setTitle(label).addLabelComponents(
+        new LabelBuilder().setLabel(label).setTextInputComponent(
+            new TextInputBuilder().setCustomId('sticky-body').setStyle(TextInputStyle.Paragraph).setRequired(true).setMaxLength(isEmbed || draft.mode === 'Container' ? 4000 : 2000).setValue(content).setPlaceholder(label)
+        )
     );
 }
 
@@ -291,8 +352,12 @@ async function deleteSetupPanel(interaction: SetupInteraction, system: SetupSyst
     await prisma.systemSetupPanel.delete({ where: { gID_system: { gID: interaction.guildId!, system } } });
 }
 
-async function disableSystem(interaction: SetupInteraction, system: SetupSystem, prisma: PrismaClient) {
+async function disableSystem(interaction: SetupInteraction, system: SetupSystem, prisma: PrismaClient, stickyService: Sticky) {
     await deleteSetupPanel(interaction, system, prisma);
+    if (system === 'stickies') {
+        const stickies = await stickyService.list(interaction.guildId!);
+        await Promise.all(stickies.map(sticky => stickyService.delete(interaction.guildId!, sticky.id)));
+    }
     await systemDefinitions[system].disable(prisma, interaction.guildId!);
 }
 
@@ -355,7 +420,7 @@ export function buildSetupOverview() {
         .addActionRowComponents(systemSelector());
 }
 
-export async function buildSetupContainer(system: SetupSystem, guildId: string, prisma: PrismaClient) {
+export async function buildSetupContainer(system: SetupSystem, guildId: string, prisma: PrismaClient, userId?: string) {
     const container = new ContainerBuilder().addActionRowComponents(systemSelector(system));
     if (system === 'welcome') {
         const settings = await prisma.welcomeSettings.upsert({ where: { gID: guildId }, update: {}, create: { gID: guildId } });
@@ -404,6 +469,32 @@ export async function buildSetupContainer(system: SetupSystem, guildId: string, 
             ))
             .addActionRowComponents(overviewButton());
     }
+    if (system === 'community') {
+        const guild = await prisma.guild.findUnique({ where: { gID: guildId } });
+        const fields = [
+            { key: 'introC', label: 'Introductions', channelId: guild?.introC ?? '', types: introChannelTypes },
+            { key: 'announcementsChannelId', label: 'Announcements', channelId: guild?.announcementsChannelId ?? '', types: textChannelTypes },
+            { key: 'taskLogsChannelId', label: 'Task logs', channelId: guild?.taskLogsChannelId ?? '', types: textChannelTypes },
+            { key: 'gamingChannelId', label: 'Gaming', channelId: guild?.gamingChannelId ?? '', types: textChannelTypes },
+            { key: 'modC', label: 'Moderation', channelId: guild?.modC ?? '', types: textChannelTypes },
+            { key: 'leaveChannelId', label: 'Leave messages', channelId: guild?.leaveChannelId ?? '', types: textChannelTypes },
+        ];
+        container.addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Community channels\nConfigure the same shared channel assignments used by the dashboard.\n\n${fields.map(field => `${field.label}: **${field.channelId ? `<#${field.channelId}>` : 'Not configured'}**`).join('\n')}`));
+        for (const field of fields) {
+            container.addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+                new ChannelSelectMenuBuilder()
+                    .setCustomId(`setup-community/${field.key}`)
+                    .setPlaceholder(`Choose ${field.label.toLowerCase()} channel`)
+                    .setMinValues(0)
+                    .setMaxValues(1)
+                    .setChannelTypes(...field.types)
+                    .setDefaultChannels(field.channelId ? [field.channelId] : [])
+            ));
+        }
+        return container
+            .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-disable/community').setLabel('Clear community channel settings').setStyle(ButtonStyle.Danger)))
+            .addActionRowComponents(overviewButton());
+    }
     if (system === 'counting') {
         const counter = await prisma.counter.findUnique({ where: { gID: guildId } });
         const enabled = counter?.active ?? false;
@@ -441,6 +532,51 @@ Non-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}
             .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-disable/server-stats').setLabel('Disable and remove stats').setStyle(ButtonStyle.Danger)))
             .addActionRowComponents(overviewButton());
     }
+    if (system === 'stickies') {
+        const settings = await prisma.stickySettings.findUnique({ where: { guildId }, include: { stickies: { orderBy: { id: 'asc' } } } });
+        const stickies = settings?.stickies ?? [];
+        const draft = userId ? stickySetupDrafts.get(stickyDraftKey(guildId, userId)) ?? newStickyDraft() : newStickyDraft();
+        const body = draft.mode === 'Embed' ? draft.description : draft.content;
+        const stickyOptions = stickies.length
+            ? stickies.slice(0, 25).map(sticky => ({ label: `${sticky.mode} - #${sticky.channelId}`.slice(0, 100), value: sticky.id, description: sticky.id }))
+            : [{ label: 'No sticky messages configured', value: 'none' }];
+        container
+            .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Sticky messages\nStatus: **${settings?.enabled ? 'Enabled' : 'Paused'}**\nLog channel: **${settings?.logsChannelId ? `<#${settings.logsChannelId}>` : 'Not configured'}**\n\n${stickies.length ? stickies.slice(0, 15).map(sticky => `**${sticky.mode}** in <#${sticky.channelId}>`).join('\n') : 'No sticky messages configured.'}${stickies.length > 15 ? '\n…and more. Select a sticky below to edit or delete it.' : ''}`))
+            .addActionRowComponents(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+                new StringSelectMenuBuilder().setCustomId('setup-sticky-select').setPlaceholder('Choose a sticky to edit or delete').addOptions(stickyOptions)
+            ))
+            .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+                new ChannelSelectMenuBuilder().setCustomId('setup-sticky-channel').setPlaceholder('Choose sticky channel').setMinValues(1).setMaxValues(1).setChannelTypes(...textChannelTypes).setDefaultChannels(draft.channelId ? [draft.channelId] : [])
+            ))
+            .addActionRowComponents(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+                new StringSelectMenuBuilder().setCustomId('setup-sticky-mode').setPlaceholder('Choose sticky format').addOptions([
+                    { label: 'Regular message', value: 'Text', default: draft.mode === 'Text' },
+                    { label: 'Embed', value: 'Embed', default: draft.mode === 'Embed' },
+                    { label: 'Container', value: 'Container', default: draft.mode === 'Container' },
+                ])
+            ))
+            .addActionRowComponents(new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(
+                new StringSelectMenuBuilder().setCustomId('setup-sticky-color').setPlaceholder('Choose sticky color').addOptions(stickyColors.map(color => ({ label: color.name, value: color.value, default: draft.color === color.value })))
+            ))
+            .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(
+                new ChannelSelectMenuBuilder().setCustomId('setup-sticky-log-channel').setPlaceholder('Choose startup log channel').setMinValues(0).setMaxValues(1).setChannelTypes(...textChannelTypes).setDefaultChannels(settings?.logsChannelId ? [settings.logsChannelId] : [])
+            ))
+            .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder().setCustomId('setup-sticky-content').setLabel(draft.mode === 'Embed' ? 'Set embed description' : draft.mode === 'Container' ? 'Set container content' : 'Set message content').setStyle(ButtonStyle.Primary),
+                new ButtonBuilder().setCustomId('setup-sticky-new').setLabel('New sticky').setStyle(ButtonStyle.Secondary),
+            ))
+            .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder().setCustomId('setup-sticky-create').setLabel('Create sticky').setStyle(ButtonStyle.Success).setDisabled(Boolean(draft.stickyId) || !settings?.logsChannelId || !draft.channelId),
+                new ButtonBuilder().setCustomId('setup-sticky-update').setLabel('Save changes').setStyle(ButtonStyle.Primary).setDisabled(!draft.stickyId),
+                new ButtonBuilder().setCustomId('setup-sticky-delete').setLabel('Delete selected').setStyle(ButtonStyle.Danger).setDisabled(!draft.stickyId),
+            ))
+            .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(
+                new ButtonBuilder().setCustomId('setup-sticky-toggle').setLabel(settings?.enabled ? 'Pause stickies' : 'Enable stickies').setStyle(settings?.enabled ? ButtonStyle.Secondary : ButtonStyle.Success).setDisabled(!settings?.enabled && !settings?.logsChannelId),
+            ))
+            .addActionRowComponents(new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('setup-disable/stickies').setLabel('Delete all sticky messages').setStyle(ButtonStyle.Danger)))
+            .addActionRowComponents(overviewButton());
+        return container;
+    }
     if (system === 'leveling') {
         const settings = await prisma.levelSettings.upsert({ where: { gID: guildId }, update: {}, create: { gID: guildId } });
         const { currencyName } = await economyLabels(prisma, guildId);
@@ -458,7 +594,7 @@ Non-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}
         return container
             .addTextDisplayComponents(new TextDisplayBuilder().setContent(`## Verification\n${panel?.messageId ? `Panel: **Enabled in <#${panel.channelId}>**` : 'Panel: **Not posted**'}\n\nVerified role: **${guild?.verifiedRole ? `<@&${guild.verifiedRole}>` : 'Not configured'}**\nNon-verified role: **${guild?.nonVerifiedRoleId ? `<@&${guild.nonVerifiedRoleId}>` : 'Not configured'}**\nIntro channel: **${guild?.introC ? `<#${guild.introC}>` : 'Not configured'}**\nRoles channel: **${guild?.rolesChannelId ? `<#${guild.rolesChannelId}>` : 'Not configured'}**`))
             .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-channel/verification').setPlaceholder('Choose verification channel').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(panel?.channelId ? [panel.channelId] : [])))
-            .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-verification-intro').setPlaceholder('Choose intro channel').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(guild?.introC ? [guild.introC] : [])))
+            .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-verification-intro').setPlaceholder('Choose intro channel').setChannelTypes(...introChannelTypes).setDefaultChannels(guild?.introC ? [guild.introC] : [])))
             .addActionRowComponents(new ActionRowBuilder<ChannelSelectMenuBuilder>().addComponents(new ChannelSelectMenuBuilder().setCustomId('setup-verification-roles').setPlaceholder('Choose roles channel').setChannelTypes(ChannelType.GuildText, ChannelType.GuildAnnouncement).setDefaultChannels(guild?.rolesChannelId ? [guild.rolesChannelId] : [])))
             .addActionRowComponents(new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(new RoleSelectMenuBuilder().setCustomId('setup-verification-verified-role').setPlaceholder('Choose verified role').setMinValues(1).setMaxValues(1).setDefaultRoles(guild?.verifiedRole ? [guild.verifiedRole] : [])))
             .addActionRowComponents(new ActionRowBuilder<RoleSelectMenuBuilder>().addComponents(new RoleSelectMenuBuilder().setCustomId('setup-verification-nonverified-role').setPlaceholder('Choose non-verified role').setMinValues(1).setMaxValues(1).setDefaultRoles(guild?.nonVerifiedRoleId ? [guild.nonVerifiedRoleId] : [])))
@@ -568,8 +704,35 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
     }
     if (interaction.isStringSelectMenu() && interaction.customId === 'setup-system') {
         const system = interaction.values[0] as SetupSystem;
-        if (isSetupSystem(system)) await interaction.update({ components: [await buildSetupContainer(system, interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
+        if (isSetupSystem(system)) await interaction.update({ components: [await buildSetupContainer(system, interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
         return;
+    }
+    if (interaction.isStringSelectMenu() && interaction.customId === 'setup-sticky-select') {
+        const selectedId = interaction.values[0];
+        const draft = stickyDraftFor(interaction.guildId!, interaction.user.id);
+        const sticky = selectedId === 'none' ? null : (await deps.sticky.list(interaction.guildId!)).find(entry => entry.id === selectedId);
+        if (!sticky) stickySetupDrafts.set(stickyDraftKey(interaction.guildId!, interaction.user.id), newStickyDraft());
+        else stickySetupDrafts.set(stickyDraftKey(interaction.guildId!, interaction.user.id), {
+            stickyId: sticky.id,
+            channelId: sticky.channelId,
+            mode: sticky.mode,
+            content: sticky.content,
+            title: sticky.title,
+            description: sticky.description,
+            color: sticky.color,
+        });
+        return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
+    }
+    if (interaction.isStringSelectMenu() && interaction.customId === 'setup-sticky-mode') {
+        const mode = interaction.values[0];
+        if (mode !== 'Text' && mode !== 'Embed' && mode !== 'Container') return;
+        stickyDraftFor(interaction.guildId!, interaction.user.id).mode = mode;
+        return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
+    }
+    if (interaction.isStringSelectMenu() && interaction.customId === 'setup-sticky-color') {
+        const selected = stickyColors.find(color => color.value === interaction.values[0]);
+        if (selected) stickyDraftFor(interaction.guildId!, interaction.user.id).color = selected.value;
+        return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
     }
     if (interaction.isStringSelectMenu() && interaction.customId === 'setup-welcome-mode') {
         const mode = interaction.values[0];
@@ -593,6 +756,34 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
             create: { gID: interaction.guildId!, gName: interaction.guild?.name ?? 'Guild', introC: interaction.values[0] },
         });
         return interaction.update({ components: [await buildSetupContainer('verification', interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
+    }
+    if (interaction.isChannelSelectMenu() && interaction.customId.startsWith('setup-community/')) {
+        const field = interaction.customId.split('/')[1];
+        const allowedFields = ['introC', 'announcementsChannelId', 'taskLogsChannelId', 'gamingChannelId', 'modC', 'leaveChannelId'] as const;
+        if (!allowedFields.includes(field as typeof allowedFields[number])) return;
+        const channelId = interaction.values[0] ?? '';
+        const data = field === 'leaveChannelId'
+            ? { leaveChannelId: channelId, leaveEnabled: Boolean(channelId) }
+            : { [field]: channelId };
+        await deps.prisma.guild.upsert({
+            where: { gID: interaction.guildId! },
+            update: data,
+            create: { gID: interaction.guildId!, gName: interaction.guild?.name ?? 'Guild', ...data },
+        });
+        return interaction.update({ components: [await buildSetupContainer('community', interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
+    }
+    if (interaction.isChannelSelectMenu() && interaction.customId === 'setup-sticky-channel') {
+        stickyDraftFor(interaction.guildId!, interaction.user.id).channelId = interaction.values[0];
+        return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
+    }
+    if (interaction.isChannelSelectMenu() && interaction.customId === 'setup-sticky-log-channel') {
+        const logsChannelId = interaction.values[0] ?? '';
+        await deps.prisma.stickySettings.upsert({
+            where: { guildId: interaction.guildId! },
+            update: { logsChannelId },
+            create: { guildId: interaction.guildId!, logsChannelId },
+        });
+        return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
     }
     if (interaction.isChannelSelectMenu() && interaction.customId === 'setup-verification-roles') {
         await deps.prisma.guild.upsert({
@@ -634,6 +825,66 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
     }
     if (interaction.isButton()) {
         if (interaction.customId === 'setup-overview') return interaction.update({ components: [buildSetupOverview()], flags: MessageFlags.IsComponentsV2 });
+        if (interaction.customId === 'setup-sticky-new') {
+            stickySetupDrafts.set(stickyDraftKey(interaction.guildId!, interaction.user.id), newStickyDraft());
+            return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
+        }
+        if (interaction.customId === 'setup-sticky-content') {
+            return interaction.showModal(stickyContentModal(stickyDraftFor(interaction.guildId!, interaction.user.id)));
+        }
+        if (interaction.customId === 'setup-sticky-create') {
+            const draft = stickyDraftFor(interaction.guildId!, interaction.user.id);
+            const settings = await deps.prisma.stickySettings.findUnique({ where: { guildId: interaction.guildId! } });
+            if (!draft.channelId || !settings?.logsChannelId) return interaction.reply({ content: 'Choose a sticky channel and startup log channel first.', flags: MessageFlags.Ephemeral });
+            if (!(draft.mode === 'Embed' ? draft.description : draft.content).trim()) return interaction.reply({ content: 'Set the sticky content before creating it.', flags: MessageFlags.Ephemeral });
+            try {
+                const sticky = await deps.sticky.create(interaction.guildId!, draft.channelId, {
+                    mode: draft.mode,
+                    content: draft.mode === 'Embed' ? '' : draft.content,
+                    title: draft.mode === 'Text' ? '' : 'Sticky Message',
+                    description: draft.mode === 'Embed' ? draft.description : '',
+                    color: draft.color,
+                });
+                draft.stickyId = sticky.id;
+                return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
+            } catch (error) {
+                const message = error instanceof Error && error.message === 'CHANNEL_STICKY_EXISTS' ? 'This channel already has a sticky message.' : error instanceof Error ? error.message : 'Failed to create sticky message.';
+                return interaction.reply({ content: message, flags: MessageFlags.Ephemeral });
+            }
+        }
+        if (interaction.customId === 'setup-sticky-update') {
+            const draft = stickyDraftFor(interaction.guildId!, interaction.user.id);
+            if (!draft.stickyId) return interaction.reply({ content: 'Select a sticky message to edit first.', flags: MessageFlags.Ephemeral });
+            if (!(draft.mode === 'Embed' ? draft.description : draft.content).trim()) return interaction.reply({ content: 'Set the sticky content before saving changes.', flags: MessageFlags.Ephemeral });
+            try {
+                const sticky = await deps.sticky.update(interaction.guildId!, draft.stickyId, {
+                    channelId: draft.channelId,
+                    mode: draft.mode,
+                    content: draft.mode === 'Embed' ? '' : draft.content,
+                    title: draft.mode === 'Text' ? '' : 'Sticky Message',
+                    description: draft.mode === 'Embed' ? draft.description : '',
+                    color: draft.color,
+                });
+                if (!sticky) return interaction.reply({ content: 'That sticky message no longer exists.', flags: MessageFlags.Ephemeral });
+                return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
+            } catch (error) {
+                const message = error instanceof Error && error.message === 'CHANNEL_STICKY_EXISTS' ? 'This channel already has a sticky message.' : error instanceof Error ? error.message : 'Failed to update sticky message.';
+                return interaction.reply({ content: message, flags: MessageFlags.Ephemeral });
+            }
+        }
+        if (interaction.customId === 'setup-sticky-delete') {
+            const draft = stickyDraftFor(interaction.guildId!, interaction.user.id);
+            if (!draft.stickyId) return interaction.reply({ content: 'Select a sticky message to delete first.', flags: MessageFlags.Ephemeral });
+            await deps.sticky.delete(interaction.guildId!, draft.stickyId);
+            stickySetupDrafts.set(stickyDraftKey(interaction.guildId!, interaction.user.id), newStickyDraft());
+            return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
+        }
+        if (interaction.customId === 'setup-sticky-toggle') {
+            const settings = await deps.prisma.stickySettings.findUnique({ where: { guildId: interaction.guildId! } });
+            if (!settings?.logsChannelId) return interaction.reply({ content: 'Choose a startup log channel before enabling sticky messages.', flags: MessageFlags.Ephemeral });
+            await deps.prisma.stickySettings.update({ where: { guildId: interaction.guildId! }, data: { enabled: !settings.enabled } });
+            return interaction.update({ components: [await buildSetupContainer('stickies', interaction.guildId!, deps.prisma, interaction.user.id)], flags: MessageFlags.IsComponentsV2 });
+        }
         if (interaction.customId === 'setup-reaction-create') return interaction.showModal(reactionCreateModal());
         if (interaction.customId === 'setup-stats-create') return interaction.showModal(serverStatsModal());
         if (interaction.customId === 'setup-verification-create') return createVerificationPanel(interaction, deps.prisma);
@@ -644,7 +895,7 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
         if (interaction.customId.startsWith('setup-disable/')) {
             const system = interaction.customId.split('/')[1] as SetupSystem;
             if (!isSetupSystem(system)) return;
-            await disableSystem(interaction, system, deps.prisma);
+            await disableSystem(interaction, system, deps.prisma, deps.sticky);
             return interaction.update({ components: [await buildSetupContainer(system, interaction.guildId!, deps.prisma)], flags: MessageFlags.IsComponentsV2 });
         }
         if (interaction.customId.startsWith('setup-enable/')) {
@@ -677,6 +928,14 @@ export async function handleSetupInteraction(interaction: SetupInteraction, deps
         if (!valid) return interaction.reply({ content: 'Please provide a valid HTTPS image URL.', flags: MessageFlags.Ephemeral });
         await deps.prisma.welcomeSettings.upsert({ where: { gID: interaction.guildId! }, update: { backgroundUrl: value }, create: { gID: interaction.guildId!, backgroundUrl: value } });
         return interaction.reply({ content: value ? 'Welcome background updated.' : 'Welcome background reset to the Orchard default.', flags: MessageFlags.Ephemeral });
+    }
+    if (interaction.isModalSubmit() && interaction.customId === 'setup-sticky-content-submit') {
+        const draft = stickyDraftFor(interaction.guildId!, interaction.user.id);
+        const content = interaction.fields.getTextInputValue('sticky-body').trim();
+        if (!content) return interaction.reply({ content: 'Sticky message content cannot be empty.', flags: MessageFlags.Ephemeral });
+        if (draft.mode === 'Embed') draft.description = content;
+        else draft.content = content;
+        return interaction.reply({ content: 'Sticky content saved to your setup draft.', flags: MessageFlags.Ephemeral });
     }
     if (interaction.isModalSubmit() && interaction.customId === 'setup-welcome-content') {
         const message = interaction.fields.getTextInputValue('welcome-message').trim();

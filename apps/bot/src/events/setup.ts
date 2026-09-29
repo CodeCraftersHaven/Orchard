@@ -16,7 +16,7 @@ export default eventModule({
             return handlePollInteraction(interaction);
         }
         if (interaction.isButton() || interaction.isChannelSelectMenu() || interaction.isRoleSelectMenu() || interaction.isStringSelectMenu() || interaction.isModalSubmit()) {
-            return handleSetupInteraction(interaction, { prisma: Service('prisma') });
+            return handleSetupInteraction(interaction, { prisma: Service('prisma'), sticky: Service('sticky') });
         }
     }
 });

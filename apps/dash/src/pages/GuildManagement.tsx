@@ -101,7 +101,12 @@ const systemGroups = {
 type SystemKey = keyof typeof systemGroups;
 type StickyDraft = Omit<StickyMessage, "id" | "messageId"> & { id?: string };
 
-function channelOptions(channels: GuildChannel[]) {
+function channelOptionLabel(channel: GuildChannel) {
+    const marker = channel.type === 2 || channel.type === 13 ? "🔊" : channel.type === 4 ? "▾" : channel.type === 15 ? "💬" : "#";
+    return `${marker} ${channel.name}`;
+}
+
+function channelOptions(channels: GuildChannel[], allowedTypes: number[] = [0, 5], allowAllNonCategoryTypes = false) {
     const grouped = new Map<string, GuildChannel[]>();
     const uncategorized: GuildChannel[] = [];
     for (const channel of channels) {
@@ -117,10 +122,10 @@ function channelOptions(channels: GuildChannel[]) {
     return (
         <>
             <option value="">Not configured</option>
-            {uncategorized.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+            {uncategorized.map((channel) => <option key={channel.id} value={channel.id} disabled={channel.type === 4 || (!allowAllNonCategoryTypes && !allowedTypes.includes(channel.type))}>{channelOptionLabel(channel)}</option>)}
             {[...grouped.entries()].map(([category, categoryChannels]) => (
                 <optgroup key={category} label={category}>
-                    {categoryChannels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+                    {categoryChannels.map((channel) => <option key={channel.id} value={channel.id} disabled={channel.type === 4 || (!allowAllNonCategoryTypes && !allowedTypes.includes(channel.type))}>{channelOptionLabel(channel)}</option>)}
                 </optgroup>
             ))}
         </>
@@ -294,7 +299,7 @@ export function GuildManagement() {
                 setReactionPanels(reactionResponse.panels);
                 setReactionChannels(reactionResponse.channels);
                 setReactionRoles(reactionResponse.roles);
-                setReactionChannelId(reactionResponse.channels[0]?.id ?? "");
+                setReactionChannelId(reactionResponse.channels.find((channel) => channel.type === 0 || channel.type === 5)?.id ?? "");
                 setReactionError(null);
             })
             .catch((err) => {
@@ -312,7 +317,7 @@ export function GuildManagement() {
             .then((response) => {
                 setStickySettings({ enabled: response.enabled, logsChannelId: response.logsChannelId });
                 setStickyMessages(response.stickies);
-                setStickyDraft((current) => ({ ...current, channelId: current.channelId || channels.find((channel) => channel.type === 0)?.id || "" }));
+                setStickyDraft((current) => ({ ...current, channelId: current.channelId || channels.find((channel) => channel.type === 0 || channel.type === 5)?.id || "" }));
             })
             .catch((err) => setError(err instanceof ApiError ? err.message : "Failed to load sticky messages."));
     }, [guildId, activeSystem, channels]);
@@ -536,7 +541,7 @@ export function GuildManagement() {
                                         onChange={(event) => updateSetting(field.key, event.target.value)}
                                         className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white outline-none transition focus:border-discord-blurple"
                                     >
-                                        {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                        {channelOptions(channels, [0, 5], field.key === "introC")}
                                     </select>
                                     {((activeSystem === "welcome" && field.key === "welcomeC") || activeSystem === "birthdays" || (activeSystem === "counting" && field.key === "countingChannel")) && <textarea
                                         value={setupNotes[field.key] ?? ""}
@@ -568,7 +573,7 @@ export function GuildManagement() {
                                 <p className="mt-1 text-sm text-slate-400">Create one Discord message with multiple emoji-to-role mappings.</p>
                                 <select value={reactionChannelId} onChange={(event) => setReactionChannelId(event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
                                     <option value="">Choose a channel</option>
-                                    {reactionChannels.map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+                                    {reactionChannels.map((channel) => <option key={channel.id} value={channel.id} disabled={channel.type !== 0 && channel.type !== 5}>{channelOptionLabel(channel)}</option>)}
                                 </select>
                                 <input value={reactionTitle} onChange={(event) => setReactionTitle(event.target.value)} placeholder="Embed title" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
                                 <textarea value={reactionDescription} onChange={(event) => setReactionDescription(event.target.value)} placeholder="Embed description" rows={3} className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
@@ -628,7 +633,7 @@ export function GuildManagement() {
                                     <span className="mt-1 block text-sm text-slate-400">Startup checks report missing sticky messages here.</span>
                                     <select value={stickySettings.logsChannelId} onChange={(event) => setStickySettings((current) => ({ ...current, logsChannelId: event.target.value }))} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
                                         <option value="">Choose a channel</option>
-                                        {channels.filter((channel) => channel.type === 0).map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}
+                                        {channels.map((channel) => <option key={channel.id} value={channel.id} disabled={channel.type !== 0 && channel.type !== 5}>{channelOptionLabel(channel)}</option>)}
                                     </select>
                                 </label>
                             </div>
@@ -639,7 +644,7 @@ export function GuildManagement() {
                                     {stickyDraft.id && <button type="button" onClick={() => setStickyDraft({ channelId: stickyDraft.channelId, mode: "Text", content: "", title: "", description: "", color: "#5865F2" })} className="text-sm text-slate-300 hover:text-white">Cancel edit</button>}
                                 </div>
                                 <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                                    <label className="text-sm text-slate-300">Channel<select value={stickyDraft.channelId} onChange={(event) => setStickyDraft((current) => ({ ...current, channelId: event.target.value }))} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white"><option value="">Choose a channel</option>{channels.filter((channel) => channel.type === 0).map((channel) => <option key={channel.id} value={channel.id}>#{channel.name}</option>)}</select></label>
+                                    <label className="text-sm text-slate-300">Channel<select value={stickyDraft.channelId} onChange={(event) => setStickyDraft((current) => ({ ...current, channelId: event.target.value }))} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white"><option value="">Choose a channel</option>{channels.map((channel) => <option key={channel.id} value={channel.id} disabled={channel.type !== 0 && channel.type !== 5}>{channelOptionLabel(channel)}</option>)}</select></label>
                                     <label className="text-sm text-slate-300">Format<select value={stickyDraft.mode} onChange={(event) => setStickyDraft((current) => ({ ...current, mode: event.target.value as StickyMode }))} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white"><option value="Text">Regular message</option><option value="Embed">Embed</option><option value="Container">Container</option></select></label>
                                 </div>
                                 {stickyDraft.mode === "Text" && <label className="mt-3 block text-sm text-slate-300">Message<textarea value={stickyDraft.content} onChange={(event) => setStickyDraft((current) => ({ ...current, content: event.target.value }))} maxLength={2000} rows={3} placeholder="Write the message to keep visible" className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-white" /></label>}
@@ -709,7 +714,7 @@ export function GuildManagement() {
                                 <div className="mt-4 grid gap-4 md:grid-cols-3">
                                     {([["statsAllChannel", "Total Members"], ["statsUsersChannel", "Users"], ["statsBotsChannel", "Bots"]] as Array<[keyof GuildSettings, string]>).map(([key, label]) => <label key={key} className="block text-sm text-slate-300">{label}
                                         <select value={String(settings[key] ?? "")} onChange={(event) => updateSetting(key, event.target.value)} className="mt-2 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
-                                            {channelOptions(channels.filter((channel) => channel.type === 2))}
+                                            {channelOptions(channels, [2])}
                                         </select>
                                     </label>)}
                                 </div>
@@ -732,7 +737,7 @@ export function GuildManagement() {
                                 <h2 className="font-semibold text-white">Verification channel</h2>
                                 <p className="mt-1 text-sm text-slate-400">Where the verification panel will be posted.</p>
                                 <select value={verificationChannelId} onChange={(event) => setVerificationChannelId(event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
-                                    {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                    {channelOptions(channels)}
                                 </select>
                                 <textarea value={setupNotes.verificationChannelId ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, verificationChannelId: event.target.value }))} rows={2} placeholder="Setup note for verification channel" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
                             </div>
@@ -740,7 +745,7 @@ export function GuildManagement() {
                                 <h2 className="font-semibold text-white">Intro channel</h2>
                                 <p className="mt-1 text-sm text-slate-400">Where verified members are directed to introduce themselves.</p>
                                 <select value={String(settings.introC ?? "")} onChange={(event) => updateSetting("introC", event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
-                                    {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                    {channelOptions(channels, [0, 5], true)}
                                 </select>
                                 <textarea value={setupNotes.introC ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, introC: event.target.value }))} rows={2} placeholder="Setup note for intro channel" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
                             </div>
@@ -748,7 +753,7 @@ export function GuildManagement() {
                                 <h2 className="font-semibold text-white">Roles channel</h2>
                                 <p className="mt-1 text-sm text-slate-400">Where verified members are directed to choose roles.</p>
                                 <select value={String(settings.rolesChannelId ?? "")} onChange={(event) => updateSetting("rolesChannelId", event.target.value)} className="mt-4 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white">
-                                    {channelOptions(channels.filter((channel) => channel.type === 0))}
+                                    {channelOptions(channels)}
                                 </select>
                                 <textarea value={setupNotes.rolesChannelId ?? ""} onChange={(event) => setSetupNotes((current) => ({ ...current, rolesChannelId: event.target.value }))} rows={2} placeholder="Setup note for roles channel" className="mt-3 w-full rounded-lg border border-white/15 bg-[#121722] px-3 py-2.5 text-sm text-white" />
                             </div>

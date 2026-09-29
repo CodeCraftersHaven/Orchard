@@ -44,7 +44,7 @@ export default async function reactionRoleRoutes(fastify: FastifyInstance) {
             ]);
             return {
                 panels: panels.map((panel) => ({ ...panel, entries: panel.roles.map((entry) => ({ ...entry, roleName: roles.find((role) => role.id === entry.roleId)?.name })) })),
-                channels: channels.filter((channel) => channel.type === 0),
+                channels,
                 roles: roles.filter((role) => !role.managed),
             };
         } catch (error) {
@@ -61,6 +61,8 @@ export default async function reactionRoleRoutes(fastify: FastifyInstance) {
             await requireAdministrator(fastify, request);
             const { channelId, title, description, entries } = request.body;
             if (!channelId || !title?.trim() || !description?.trim() || !Array.isArray(entries) || entries.length < 1 || entries.length > 20) return reply.code(400).send({ error: "A channel, title, description, and 1-20 role reactions are required." });
+            const channels = await getBotGuildChannels(request.params.guildId);
+            if (!channels.some(channel => channel.id === channelId && (channel.type === 0 || channel.type === 5))) return reply.code(400).send({ error: "Choose a text or announcement channel." });
             const roles = await getBotGuildRoles(request.params.guildId);
             if (entries.some((entry) => !entry.roleId || !entry.emoji || !roles.some((role) => role.id === entry.roleId && !role.managed))) return reply.code(400).send({ error: "Every reaction must use a valid, non-managed guild role." });
             const prefix = request.params.guildId.slice(-4);
